@@ -17,6 +17,23 @@ class InstrumentType(str, Enum):
     EQUITY = "equity"
     DERIVATIVE = "derivative"
     CASH = "cash"
+
+    # Interbank operations
+    INTERBANK_LOAN = "interbank_loan"  # МБК (размещение и привлечение)
+    REPO = "repo"  # Прямое РЕПО
+    REVERSE_REPO = "reverse_repo"  # Обратное РЕПО
+
+    # Accounts
+    CURRENT_ACCOUNT = "current_account"  # Текущие счета
+    CORRESPONDENT_ACCOUNT = "correspondent_account"  # Корреспондентские счета и ЛОРО
+
+    # Other balance sheet items
+    OTHER_ASSET = "other_asset"  # Прочие активы
+    OTHER_LIABILITY = "other_liability"  # Прочие пассивы
+
+    # Off-balance sheet
+    OFF_BALANCE = "off_balance"  # Внебалансовые инструменты
+
     OTHER = "other"
 
 
