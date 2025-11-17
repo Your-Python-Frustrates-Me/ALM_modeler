@@ -1,0 +1,388 @@
+{
+  "description": "Пример конфигурации behavioral assumptions, заменяющий персональные предпосылки из старого кода",
+  "version": "1.0",
+
+  "rules": [
+    {
+      "rule_id": "rule_vip_deposits",
+      "rule_type": "combined",
+      "priority": 100,
+      "description": "VIP депозиты - крупные клиенты с высокой устойчивостью",
+      "active": true,
+      "conditions": {
+        "instrument_class": "ДЮЛ",
+        "amount": {
+          ">=": 1000000000
+        }
+      },
+      "assumptions": {
+        "stable_portion": 0.9,
+        "avg_life_days": 365,
+        "runoff_rates": {
+          "NAME": {
+            "overnight": 0.02,
+            "2-7d": 0.03,
+            "8-30d": 0.05
+          },
+          "MARKET": {
+            "overnight": 0.05,
+            "2-7d": 0.08,
+            "8-30d": 0.10
+          },
+          "COMBO": {
+            "overnight": 0.10,
+            "2-7d": 0.15,
+            "8-30d": 0.20
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "rule_government_stable",
+      "rule_type": "counterparty_type",
+      "priority": 95,
+      "description": "Государственные и федеральные средства - высокая стабильность кроме досрочных",
+      "active": true,
+      "conditions": {
+        "counterparty_type": "government"
+      },
+      "assumptions": {
+        "stable_portion": 0.95,
+        "avg_life_days": 180,
+        "runoff_rates": {
+          "NAME": {
+            "overnight": 0.01,
+            "2-7d": 0.02,
+            "8-30d": 0.02
+          },
+          "MARKET": {
+            "overnight": 0.03,
+            "2-7d": 0.05,
+            "8-30d": 0.05
+          },
+          "COMBO": {
+            "overnight": 0.05,
+            "2-7d": 0.08,
+            "8-30d": 0.10
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "rule_municipal_finance",
+      "rule_type": "counterparty_type",
+      "priority": 90,
+      "description": "Средства муниципальных органов - высокая стабильность",
+      "active": true,
+      "conditions": {
+        "counterparty_type": "municipal"
+      },
+      "assumptions": {
+        "stable_portion": 0.9,
+        "avg_life_days": 120,
+        "runoff_rates": {
+          "NAME": {
+            "overnight": 0.02,
+            "2-7d": 0.03,
+            "8-30d": 0.05
+          },
+          "MARKET": {
+            "overnight": 0.05,
+            "2-7d": 0.08,
+            "8-30d": 0.10
+          },
+          "COMBO": {
+            "overnight": 0.08,
+            "2-7d": 0.12,
+            "8-30d": 0.15
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "rule_corporate_holding",
+      "rule_type": "combined",
+      "priority": 85,
+      "description": "Крупные холдинги - средняя волатильность",
+      "active": true,
+      "conditions": {
+        "counterparty_type": "corporate",
+        "amount": {
+          ">=": 500000000
+        }
+      },
+      "assumptions": {
+        "stable_portion": 0.6,
+        "avg_life_days": 90,
+        "runoff_rates": {
+          "NAME": {
+            "overnight": 0.10,
+            "2-7d": 0.15,
+            "8-30d": 0.20
+          },
+          "MARKET": {
+            "overnight": 0.20,
+            "2-7d": 0.25,
+            "8-30d": 0.30
+          },
+          "COMBO": {
+            "overnight": 0.30,
+            "2-7d": 0.35,
+            "8-30d": 0.40
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "rule_non_resident_cny",
+      "rule_type": "combined",
+      "priority": 80,
+      "description": "Средства нерезидентов в юанях - повышенный отток",
+      "active": true,
+      "conditions": {
+        "currency": "CNY",
+        "counterparty_type": "corporate"
+      },
+      "assumptions": {
+        "stable_portion": 0.3,
+        "avg_life_days": 30,
+        "runoff_rates": {
+          "NAME": {
+            "overnight": 0.20,
+            "2-7d": 0.30,
+            "8-30d": 0.30
+          },
+          "MARKET": {
+            "overnight": 0.30,
+            "2-7d": 0.40,
+            "8-30d": 0.40
+          },
+          "COMBO": {
+            "overnight": 0.50,
+            "2-7d": 0.60,
+            "8-30d": 0.70
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "rule_nso_overnight",
+      "rule_type": "instrument_subclass",
+      "priority": 110,
+      "description": "Неснижаемый остаток - рассматривается как overnight",
+      "active": true,
+      "conditions": {
+        "instrument_subclass": {
+          "in": [
+            "Неснижаемый остаток",
+            "Неснижаемый остаток на р/с через Б-К"
+          ]
+        }
+      },
+      "assumptions": {
+        "maturity_override": 1,
+        "runoff_override": 1.0
+      }
+    },
+    {
+      "rule_id": "rule_retail_deposits",
+      "rule_type": "counterparty_type",
+      "priority": 50,
+      "description": "Розничные депозиты - стандартные assumptions",
+      "active": true,
+      "conditions": {
+        "counterparty_type": "retail"
+      },
+      "assumptions": {
+        "stable_portion": 0.7,
+        "avg_life_days": 180,
+        "runoff_rates": {
+          "NAME": {
+            "overnight": 0.05,
+            "2-7d": 0.10,
+            "8-30d": 0.15
+          },
+          "MARKET": {
+            "overnight": 0.10,
+            "2-7d": 0.15,
+            "8-30d": 0.20
+          },
+          "COMBO": {
+            "overnight": 0.15,
+            "2-7d": 0.20,
+            "8-30d": 0.25
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "rule_corporate_deposits",
+      "rule_type": "counterparty_type",
+      "priority": 45,
+      "description": "Корпоративные депозиты - стандартные assumptions",
+      "active": true,
+      "conditions": {
+        "counterparty_type": "corporate"
+      },
+      "assumptions": {
+        "stable_portion": 0.5,
+        "avg_life_days": 90,
+        "runoff_rates": {
+          "NAME": {
+            "overnight": 0.15,
+            "2-7d": 0.20,
+            "8-30d": 0.25
+          },
+          "MARKET": {
+            "overnight": 0.25,
+            "2-7d": 0.30,
+            "8-30d": 0.35
+          },
+          "COMBO": {
+            "overnight": 0.35,
+            "2-7d": 0.40,
+            "8-30d": 0.45
+          }
+        }
+      }
+    }
+  ],
+
+  "counterparty_assumptions": {
+    "EXAMPLE_MAJOR_CORPORATION_A": {
+      "description": "Пример: Крупная корпорация A - аналог Газпрома в старом коде",
+      "stable_portion": 0.0,
+      "avg_life_days": 1,
+      "overnight_treatment": true,
+      "full_outflow": true,
+      "maximum_outflow": 20000000000,
+      "runoff_rates": {
+        "NAME": {
+          "overnight": 1.0
+        },
+        "MARKET": {
+          "overnight": 1.0
+        },
+        "COMBO": {
+          "overnight": 1.0
+        }
+      }
+    },
+    "EXAMPLE_TREASURY": {
+      "description": "Пример: Казначейство - средства с возможностью досрочного изъятия",
+      "stable_portion": 0.0,
+      "avg_life_days": 1,
+      "early_withdrawal_probability": 1.0,
+      "early_withdrawal_portion": 1.0,
+      "maximum_outflow": 30000000000,
+      "runoff_rates": {
+        "NAME": {
+          "overnight": 1.0
+        },
+        "MARKET": {
+          "overnight": 1.0
+        },
+        "COMBO": {
+          "overnight": 1.0
+        }
+      }
+    },
+    "EXAMPLE_MUNICIPAL_FINANCE": {
+      "description": "Пример: Департамент финансов города - высокая стабильность",
+      "stable_portion": 0.95,
+      "avg_life_days": 180,
+      "runoff_rates": {
+        "NAME": {
+          "overnight": 0.01,
+          "2-7d": 0.02,
+          "8-30d": 0.02
+        },
+        "MARKET": {
+          "overnight": 0.03,
+          "2-7d": 0.05,
+          "8-30d": 0.05
+        },
+        "COMBO": {
+          "overnight": 0.05,
+          "2-7d": 0.08,
+          "8-30d": 0.10
+        }
+      }
+    },
+    "EXAMPLE_HOLDING_GROUP": {
+      "description": "Пример: Холдинговая группа - средняя стабильность",
+      "stable_portion": 0.6,
+      "avg_life_days": 90,
+      "runoff_rates": {
+        "NAME": {
+          "overnight": 0.10,
+          "2-7d": 0.15,
+          "8-30d": 0.20
+        },
+        "MARKET": {
+          "overnight": 0.20,
+          "2-7d": 0.25,
+          "8-30d": 0.30
+        },
+        "COMBO": {
+          "overnight": 0.30,
+          "2-7d": 0.35,
+          "8-30d": 0.40
+        }
+      }
+    },
+    "EXAMPLE_OIL_COMPANY": {
+      "description": "Пример: Нефтяная компания - особые условия для юаней (аналог Роснефти)",
+      "stable_portion": 0.3,
+      "avg_life_days": 30,
+      "runoff_rates": {
+        "NAME": {
+          "overnight": 0.20,
+          "2-7d": 0.30,
+          "8-30d": 0.30
+        },
+        "MARKET": {
+          "overnight": 0.30,
+          "2-7d": 0.40,
+          "8-30d": 0.50
+        },
+        "COMBO": {
+          "overnight": 0.50,
+          "2-7d": 0.60,
+          "8-30d": 0.70
+        }
+      }
+    }
+  },
+
+  "notes": [
+    "Эта конфигурация заменяет все персональные предпосылки из старого кода",
+    "Вместо хардкода имен контрагентов (Газпром, Казначейство, и т.д.) используются:",
+    "  1. Правила по типам контрагентов (government, municipal, corporate, retail)",
+    "  2. Правила по классам инструментов",
+    "  3. Правила по пороговым значениям сумм",
+    "  4. Специальные assumptions для конкретных контрагентов (если необходимо)",
+    "",
+    "Преимущества подхода:",
+    "  - Нет хардкода персональных данных в коде",
+    "  - Конфигурация легко изменяется без изменения кода",
+    "  - Прозрачная система приоритетов",
+    "  - Возможность комбинировать условия",
+    "  - Легко добавлять новые правила",
+    "",
+    "Как использовать:",
+    "  1. Создайте свою конфигурацию на основе этого примера",
+    "  2. Замените EXAMPLE_* на реальные имена контрагентов (если нужно)",
+    "  3. Настройте коэффициенты под свои требования",
+    "  4. Загрузите конфигурацию через BehavioralAssumptionsManager.load_from_config()",
+    "",
+    "Соответствие старым предпосылкам:",
+    "  - Газпром -> EXAMPLE_MAJOR_CORPORATION_A (100% отток на 1 день, макс 20 млрд)",
+    "  - Казначейство -> EXAMPLE_TREASURY (100% отток на 1 день, макс 30 млрд)",
+    "  - ДепФин -> EXAMPLE_MUNICIPAL_FINANCE (высокая стабильность)",
+    "  - ГК МАРС -> EXAMPLE_HOLDING_GROUP (средняя стабильность)",
+    "  - Роснефть (юани) -> EXAMPLE_OIL_COMPANY (70% отток в COMBO)",
+    "  - НСО -> rule_nso_overnight (overnight treatment)",
+    "  - VIP депозиты -> rule_vip_deposits (по сумме >= 1 млрд)"
+  ]
+}
