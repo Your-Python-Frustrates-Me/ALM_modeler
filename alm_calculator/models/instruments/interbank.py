@@ -36,6 +36,26 @@ class InterbankLoan(BaseInstrument):
     counterparty_bank: Optional[str] = None  # Наименование банка-контрагента
     credit_rating: Optional[str] = None  # Кредитный рейтинг контрагента
 
+    # Дополнительные поля для классификации и учета
+    instrument_class: Optional[str] = None  # Класс инструмента
+    instrument_subclass: Optional[str] = None  # Подкласс инструмента
+    counterparty_name: Optional[str] = None  # Имя контрагента
+
+    # Параметры процентных платежей
+    is_interest: bool = False  # False - платеж тела, True - процентный платеж
+
+    # Параметры ставки
+    is_fix: bool = True  # True - фиксированная ставка, False - плавающая
+    fix_rate: Optional[float] = None  # Фиксированная ставка (если is_fix=True)
+    float_indicator: Optional[str] = None  # Индикатор плавающей ставки (RUONIA, KeyRate и т.д.)
+    float_margin: Optional[float] = None  # Маржа плавающей ставки
+
+    # Дополнительные даты
+    trade_date: Optional[date] = None  # Дата заключения сделки
+
+    # Портфельная принадлежность
+    trading_portfolio: Optional[str] = None  # Торговый портфель
+
     def __init__(self, **data):
         super().__init__(**data)
         # Автоматически определяем направление по знаку amount
