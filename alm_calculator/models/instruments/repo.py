@@ -37,6 +37,34 @@ class Repo(BaseInstrument):
     haircut: Optional[float] = None  # Дисконт обеспечения (обычно 0-20%)
     counterparty_type: str = 'bank'  # Обычно контрагент - банк или ЦБ РФ
 
+    # Дополнительные поля для классификации и учета
+    instrument_class: Optional[str] = None  # Класс инструмента
+    instrument_subclass: Optional[str] = None  # Подкласс инструмента
+    counterparty_name: Optional[str] = None  # Имя контрагента
+
+    # Параметры процентных платежей
+    is_interest: bool = False  # False - платеж тела, True - процентный платеж
+    interest_period: Optional[int] = None  # Частота уплаты процентов в днях
+
+    # Параметры ставки
+    is_fix: bool = True  # True - фиксированная ставка, False - плавающая
+    fix_rate: Optional[float] = None  # Фиксированная ставка (если is_fix=True)
+    float_indicator: Optional[str] = None  # Индикатор плавающей ставки (RUONIA, KeyRate и т.д.)
+    float_margin: Optional[float] = None  # Маржа плавающей ставки
+
+    # Дополнительные даты
+    trade_date: Optional[date] = None  # Дата заключения сделки
+
+    # Детали переданного обеспечения (ценных бумаг)
+    collateral_isin: Optional[str] = None  # ISIN переданной бумаги
+    collateral_name: Optional[str] = None  # Название переданной бумаги
+    collateral_currency: Optional[str] = None  # Валюта переданной бумаги
+    collateral_quantity: Optional[Decimal] = None  # Количество переданных бумаг
+    collateral_price: Optional[Decimal] = None  # Цена/стоимость переданных бумаг
+
+    # Портфельная принадлежность
+    trading_portfolio: Optional[str] = None  # Торговый портфель
+
     def calculate_risk_contribution(
         self,
         calculation_date: date,
@@ -147,6 +175,34 @@ class ReverseRepo(BaseInstrument):
     collateral_value: Optional[Decimal] = None  # Рыночная стоимость обеспечения
     haircut: Optional[float] = None  # Дисконт обеспечения
     counterparty_type: str = 'bank'  # Обычно контрагент - банк
+
+    # Дополнительные поля для классификации и учета
+    instrument_class: Optional[str] = None  # Класс инструмента
+    instrument_subclass: Optional[str] = None  # Подкласс инструмента
+    counterparty_name: Optional[str] = None  # Имя контрагента
+
+    # Параметры процентных платежей
+    is_interest: bool = False  # False - платеж тела, True - процентный платеж
+    interest_period: Optional[int] = None  # Частота уплаты процентов в днях
+
+    # Параметры ставки
+    is_fix: bool = True  # True - фиксированная ставка, False - плавающая
+    fix_rate: Optional[float] = None  # Фиксированная ставка (если is_fix=True)
+    float_indicator: Optional[str] = None  # Индикатор плавающей ставки (RUONIA, KeyRate и т.д.)
+    float_margin: Optional[float] = None  # Маржа плавающей ставки
+
+    # Дополнительные даты
+    trade_date: Optional[date] = None  # Дата заключения сделки
+
+    # Детали полученного обеспечения (ценных бумаг)
+    collateral_isin: Optional[str] = None  # ISIN полученной бумаги
+    collateral_name: Optional[str] = None  # Название полученной бумаги
+    collateral_currency: Optional[str] = None  # Валюта полученной бумаги
+    collateral_quantity: Optional[Decimal] = None  # Количество полученных бумаг
+    collateral_price: Optional[Decimal] = None  # Цена/стоимость полученных бумаг
+
+    # Портфельная принадлежность
+    trading_portfolio: Optional[str] = None  # Торговый портфель
 
     def calculate_risk_contribution(
         self,
