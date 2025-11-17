@@ -6,6 +6,9 @@ from alm_calculator.models.instruments.deposit import Deposit
 from alm_calculator.models.instruments.interbank import InterbankLoan
 from alm_calculator.models.instruments.repo import Repo, ReverseRepo
 from alm_calculator.models.instruments.bond import Bond
+from alm_calculator.models.instruments.derivatives import (
+    BaseDerivative, IRS, FxSwap, Futures, OIS, TOM, DepositMargin, Forward, XCCY
+)
 from alm_calculator.models.instruments.current_account import CurrentAccount
 from alm_calculator.models.instruments.correspondent_account import CorrespondentAccount
 from alm_calculator.models.instruments.other_balance_items import OtherAsset, OtherLiability
@@ -18,6 +21,15 @@ __all__ = [
     'Repo',
     'ReverseRepo',
     'Bond',
+    'BaseDerivative',
+    'IRS',
+    'FxSwap',
+    'Futures',
+    'OIS',
+    'TOM',
+    'DepositMargin',
+    'Forward',
+    'XCCY',
     'CurrentAccount',
     'CorrespondentAccount',
     'OtherAsset',

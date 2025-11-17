@@ -9,6 +9,9 @@ from alm_calculator.models.instruments.deposit import Deposit
 from alm_calculator.models.instruments.interbank import InterbankLoan
 from alm_calculator.models.instruments.repo import Repo, ReverseRepo
 from alm_calculator.models.instruments.bond import Bond
+from alm_calculator.models.instruments.derivatives import (
+    BaseDerivative, IRS, FxSwap, Futures, OIS, TOM, DepositMargin, Forward, XCCY
+)
 from alm_calculator.models.instruments.current_account import CurrentAccount
 from alm_calculator.models.instruments.correspondent_account import CorrespondentAccount
 from alm_calculator.models.instruments.other_balance_items import OtherAsset, OtherLiability
@@ -37,12 +40,25 @@ class InstrumentFactory:
         InstrumentType.REPO: Repo,
         InstrumentType.REVERSE_REPO: ReverseRepo,
         InstrumentType.BOND: Bond,
+        InstrumentType.DERIVATIVE: BaseDerivative,  # Базовый класс, подтип определяется отдельно
         InstrumentType.CURRENT_ACCOUNT: CurrentAccount,
         InstrumentType.CORRESPONDENT_ACCOUNT: CorrespondentAccount,
         InstrumentType.OTHER_ASSET: OtherAsset,
         InstrumentType.OTHER_LIABILITY: OtherLiability,
         InstrumentType.OFF_BALANCE: OffBalanceInstrument,
         # InstrumentType.EQUITY: Equity,
+    }
+
+    # Маппинг подтипов деривативов на классы
+    DERIVATIVE_SUBTYPE_CLASSES: Dict[str, Type[BaseDerivative]] = {
+        'IRS': IRS,
+        'FxSwap': FxSwap,
+        'Futures': Futures,
+        'OIS': OIS,
+        'TOM': TOM,
+        'DepositMargin': DepositMargin,
+        'Forward': Forward,
+        'XCCY': XCCY,
     }
 
     def __init__(self, mapping_config: Dict):
@@ -99,6 +115,21 @@ class InstrumentFactory:
             # Fallback: создаем generic instrument
             # TODO: Реализовать GenericInstrument для неизвестных типов
             raise ValueError(f"Unsupported instrument type: {instrument_type}")
+
+        # Для деривативов выбираем конкретный подкласс по derivative_type
+        if instrument_type == InstrumentType.DERIVATIVE:
+            derivative_type = balance_row.get('derivative_type') or balance_row.get('instrument_subclass')
+            if derivative_type in self.DERIVATIVE_SUBTYPE_CLASSES:
+                instrument_class = self.DERIVATIVE_SUBTYPE_CLASSES[derivative_type]
+                logger.debug(
+                    f"Selected derivative subclass {derivative_type}",
+                    extra={'position_id': balance_row.get('position_id')}
+                )
+            else:
+                logger.warning(
+                    f"Unknown derivative type {derivative_type}, using BaseDerivative",
+                    extra={'position_id': balance_row.get('position_id')}
+                )
 
         # Подготавливаем данные для инициализации
         init_data = self._prepare_init_data(balance_row, instrument_type)
