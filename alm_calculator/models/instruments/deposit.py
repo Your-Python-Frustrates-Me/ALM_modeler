@@ -3,8 +3,8 @@ from typing import Dict, List, Optional
 from datetime import date, timedelta
 from decimal import Decimal
 
-from core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
-from utils.date_utils import assign_to_bucket
+from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
+from alm_calculator.utils.date_utils import assign_to_bucket
 
 
 class Deposit(BaseInstrument):
