@@ -45,9 +45,6 @@ class Loan(BaseInstrument):
     # Дополнительные даты
     trade_date: Optional[date] = None  # Дата заключения сделки
 
-    # Портфельная принадлежность
-    trading_portfolio: Optional[str] = None  # Торговый портфель
-
     # Параметры резервирования и качества
     reserve_rate: Optional[float] = None  # Ставка резерва (в долях от суммы кредита)
     credit_quality_category: Optional[str] = None  # Категория качества кредита (I, II, III, IV, V)

@@ -37,6 +37,17 @@ class InstrumentType(str, Enum):
     OTHER = "other"
 
 
+class BookType(str, Enum):
+    """
+    Классификация инструментов по книгам банка.
+
+    TRADING - Торговая книга (инструменты, предназначенные для торговли)
+    BANKING - Банковская книга (инструменты, удерживаемые до погашения)
+    """
+    TRADING = "trading"
+    BANKING = "banking"
+
+
 class RiskContribution(BaseModel):
     """
     Вклад инструмента в риск-метрики
@@ -94,7 +105,11 @@ class BaseInstrument(ABC, BaseModel):
     interest_rate: Optional[float] = None
     counterparty_id: Optional[str] = None
     counterparty_type: Optional[str] = None  # 'retail', 'corporate', 'bank'
-    
+
+    # Портфельная принадлежность и книга
+    trading_portfolio: Optional[str] = None  # Торговый портфель (определяет принадлежность к книге)
+    book: Optional['BookType'] = None  # Книга (trading/banking), автоматически определяется по trading_portfolio
+
     # Метаданные
     data_source: str = "balance"
     version: str = "1.0"
@@ -146,7 +161,35 @@ class BaseInstrument(ABC, BaseModel):
     def is_asset(self) -> bool:
         """Является ли инструмент активом (True) или пассивом (False)"""
         return self.amount > 0
-    
+
+    def determine_book(self) -> 'BookType':
+        """
+        Определяет принадлежность инструмента к торговой или банковской книге.
+
+        Логика определения:
+        - Если trading_portfolio указан и начинается с "TRADING_" - торговая книга
+        - В противном случае - банковская книга
+
+        Returns:
+            BookType: TRADING или BANKING
+        """
+        if self.trading_portfolio and self.trading_portfolio.startswith("TRADING_"):
+            return BookType.TRADING
+        return BookType.BANKING
+
+    def get_book(self) -> 'BookType':
+        """
+        Возвращает книгу инструмента (торговую или банковскую).
+
+        Если book не установлена явно, определяет автоматически по trading_portfolio.
+
+        Returns:
+            BookType: TRADING или BANKING
+        """
+        if self.book is None:
+            return self.determine_book()
+        return self.book
+
     def to_dict(self) -> Dict:
         """Сериализация в словарь"""
         return self.model_dump()

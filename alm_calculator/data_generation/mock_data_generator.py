@@ -53,6 +53,20 @@ class MockDataGenerator:
 
         self.counterparty_types = ['retail', 'corporate', 'bank', 'government', 'central_bank']
 
+        # Торговые портфели (для определения книги)
+        # Портфели с префиксом "TRADING_" относятся к торговой книге
+        # Остальные - к банковской книге
+        self.trading_portfolios = [
+            'TRADING_BONDS',
+            'TRADING_DERIVATIVES',
+            'TRADING_FX',
+            'TRADING_REPO',
+            'BANKING_LOANS',
+            'BANKING_DEPOSITS',
+            'BANKING_INTERBANK',
+            'BANKING_RETAIL'
+        ]
+
         # Балансовые счета (упрощенная классификация)
         self.balance_accounts = {
             'loan': ['40101', '40102', '40103', '45201', '45202'],
@@ -65,6 +79,69 @@ class MockDataGenerator:
             'other_asset': ['60101', '60201', '60301'],
             'other_liability': ['60302', '60303', '60401'],
         }
+
+    def _assign_trading_portfolio(
+        self,
+        instrument_type: str,
+        counterparty_type: str = None,
+        is_short_term: bool = False
+    ) -> str:
+        """
+        Определяет торговый портфель инструмента на основе его характеристик.
+
+        Args:
+            instrument_type: Тип инструмента
+            counterparty_type: Тип контрагента
+            is_short_term: Является ли инструмент краткосрочным
+
+        Returns:
+            Название торгового портфеля
+        """
+        # Вероятность попадания в торговую книгу зависит от типа инструмента
+        trading_probability = {
+            'loan': 0.05,  # Большинство кредитов - в банковской книге
+            'deposit': 0.02,  # Депозиты обычно в банковской книге
+            'interbank': 0.20,  # МБК могут быть в торговой книге если короткие
+            'repo': 0.40,  # РЕПО часто для торговых целей
+            'reverse_repo': 0.30,
+            'bond': 0.50,  # Облигации могут быть в обеих книгах
+            'derivative': 0.80,  # Деривативы чаще в торговой книге
+            'current_account': 0.0,  # Текущие счета только в банковской
+            'correspondent': 0.0,  # Корсчета только в банковской
+            'other': 0.10
+        }
+
+        prob = trading_probability.get(instrument_type, 0.10)
+
+        # Короткие инструменты чаще в торговой книге
+        if is_short_term:
+            prob *= 1.5
+
+        # Определяем книгу
+        is_trading = np.random.rand() < prob
+
+        if is_trading:
+            # Торговая книга
+            if instrument_type in ['repo', 'reverse_repo']:
+                return 'TRADING_REPO'
+            elif instrument_type in ['derivative', 'off_balance']:
+                return 'TRADING_DERIVATIVES'
+            elif instrument_type == 'bond':
+                return 'TRADING_BONDS'
+            else:
+                return 'TRADING_FX'
+        else:
+            # Банковская книга
+            if instrument_type in ['loan']:
+                return 'BANKING_LOANS'
+            elif instrument_type in ['deposit']:
+                return 'BANKING_DEPOSITS'
+            elif instrument_type in ['interbank', 'repo', 'reverse_repo']:
+                return 'BANKING_INTERBANK'
+            elif counterparty_type == 'retail':
+                return 'BANKING_RETAIL'
+            else:
+                return 'BANKING_DEPOSITS'
 
     def generate_all_instruments(
         self,
@@ -183,6 +260,10 @@ class MockDataGenerator:
             else:
                 repricing_date = maturity_date  # Фиксированная ставка
 
+            # Определяем торговый портфель
+            is_short_term = maturity_days < 365
+            trading_portfolio = self._assign_trading_portfolio('loan', cpty_type, is_short_term)
+
             loan = {
                 'instrument_id': f'LOAN_{i:08d}',
                 'instrument_type': 'loan',
@@ -196,6 +277,7 @@ class MockDataGenerator:
                 'counterparty_type': cpty_type,
                 'as_of_date': self.as_of_date.isoformat(),
                 'repricing_date': repricing_date.isoformat() if repricing_date and repricing_date > self.as_of_date else None,
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -296,6 +378,10 @@ class MockDataGenerator:
                 interest_rate = (base_rate + spread) / 100
                 interest_rate = max(interest_rate, 0.5 / 100)
 
+            # Определяем торговый портфель
+            is_short_term = not is_demand and maturity_days < 365 if not is_demand else False
+            trading_portfolio = self._assign_trading_portfolio('deposit', cpty_type, is_short_term)
+
             deposit = {
                 'instrument_id': f'DEPO_{i:08d}',
                 'instrument_type': 'deposit',
@@ -312,6 +398,7 @@ class MockDataGenerator:
                 'core_portion': core_portion,
                 'avg_life_years': avg_life_years,
                 'withdrawal_rates': str(withdrawal_rates) if withdrawal_rates else None,
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -355,6 +442,10 @@ class MockDataGenerator:
             spread = np.random.uniform(-0.5, 1.5)
             interest_rate = (base_rate + spread) / 100
 
+            # Определяем торговый портфель
+            is_short_term = maturity_days <= 90
+            trading_portfolio = self._assign_trading_portfolio('interbank', 'bank', is_short_term)
+
             mbk = {
                 'instrument_id': f'MBK_{i:08d}',
                 'instrument_type': 'interbank_loan',
@@ -370,6 +461,7 @@ class MockDataGenerator:
                 'is_placement': is_placement,
                 'counterparty_bank': f'Bank_{i % 100:03d}',
                 'credit_rating': np.random.choice(['AAA', 'AA', 'A', 'BBB', 'BB'], p=[0.05, 0.15, 0.40, 0.30, 0.10]),
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -412,6 +504,10 @@ class MockDataGenerator:
             haircut = np.random.uniform(0.05, 0.20) if collateral_type == 'Corporate_Bonds' else np.random.uniform(0.0, 0.10)
             collateral_value = amount * (1 + haircut)
 
+            # Определяем торговый портфель (РЕПО часто в торговой книге)
+            is_short_term = maturity_days <= 30
+            trading_portfolio = self._assign_trading_portfolio('repo', 'bank', is_short_term)
+
             repo = {
                 'instrument_id': f'REPO_{i:08d}',
                 'instrument_type': 'repo',
@@ -428,6 +524,7 @@ class MockDataGenerator:
                 'collateral_type': collateral_type,
                 'collateral_value': float(collateral_value),
                 'haircut': haircut,
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -470,6 +567,10 @@ class MockDataGenerator:
             haircut = np.random.uniform(0.05, 0.15) if collateral_type == 'Corporate_Bonds' else np.random.uniform(0.0, 0.08)
             collateral_value = amount * (1 + haircut)
 
+            # Определяем торговый портфель
+            is_short_term = maturity_days <= 30
+            trading_portfolio = self._assign_trading_portfolio('reverse_repo', 'bank', is_short_term)
+
             rrepo = {
                 'instrument_id': f'RREPO_{i:08d}',
                 'instrument_type': 'reverse_repo',
@@ -486,6 +587,7 @@ class MockDataGenerator:
                 'collateral_type': collateral_type,
                 'collateral_value': float(collateral_value),
                 'haircut': haircut,
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -533,6 +635,9 @@ class MockDataGenerator:
             # Процентная ставка (обычно низкая или 0)
             interest_rate = np.random.uniform(0.0, 0.5) / 100
 
+            # Определяем торговый портфель (текущие счета всегда в банковской книге)
+            trading_portfolio = self._assign_trading_portfolio('current_account', cpty_type, False)
+
             current_acc = {
                 'instrument_id': f'CURR_ACC_{i:08d}',
                 'instrument_type': 'current_account',
@@ -548,6 +653,7 @@ class MockDataGenerator:
                 'is_transactional': True,
                 'stable_portion': stable_portion,
                 'avg_life_days': avg_life_days,
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -610,6 +716,9 @@ class MockDataGenerator:
                 counterparty_type = 'bank'
                 correspondent_bank = f'Bank_{i % 150:03d}'
 
+            # Определяем торговый портфель (корсчета всегда в банковской книге)
+            trading_portfolio = self._assign_trading_portfolio('correspondent', counterparty_type, False)
+
             corr_acc = {
                 'instrument_id': f'CORR_ACC_{i:08d}',
                 'instrument_type': 'correspondent_account',
@@ -625,6 +734,7 @@ class MockDataGenerator:
                 'account_type': account_type,
                 'correspondent_bank': correspondent_bank,
                 'is_required_reserve': account_type == 'cbr_required_reserve',
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -678,6 +788,9 @@ class MockDataGenerator:
             else:
                 liquidity_haircut = np.random.uniform(0.10, 0.30) if is_monetary else 1.0
 
+            # Определяем торговый портфель
+            trading_portfolio = self._assign_trading_portfolio('other', None, False)
+
             other_asset = {
                 'instrument_id': f'OTHER_ASSET_{i:08d}',
                 'instrument_type': 'other_asset',
@@ -693,6 +806,7 @@ class MockDataGenerator:
                 'asset_category': asset_category,
                 'is_monetary': is_monetary,
                 'liquidity_haircut': liquidity_haircut,
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -742,6 +856,9 @@ class MockDataGenerator:
             start_date = self.as_of_date - timedelta(days=int(np.random.uniform(0, maturity_days * 0.3)))
             maturity_date = start_date + timedelta(days=maturity_days)
 
+            # Определяем торговый портфель
+            trading_portfolio = self._assign_trading_portfolio('other', None, False)
+
             other_liability = {
                 'instrument_id': f'OTHER_LIAB_{i:08d}',
                 'instrument_type': 'other_liability',
@@ -757,6 +874,7 @@ class MockDataGenerator:
                 'liability_category': liability_category,
                 'is_monetary': is_monetary,
                 'priority_level': np.random.choice(['senior', 'subordinated'], p=[0.90, 0.10]),
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
@@ -837,6 +955,10 @@ class MockDataGenerator:
                 utilized_amount = None
                 available_amount = None
 
+            # Определяем торговый портфель (деривативы часто в торговой книге)
+            is_short_term = expiry_days <= 180
+            trading_portfolio = self._assign_trading_portfolio('derivative', None, is_short_term)
+
             off_bal = {
                 'instrument_id': f'OFF_BAL_{i:08d}',
                 'instrument_type': 'off_balance',
@@ -862,6 +984,7 @@ class MockDataGenerator:
                 'is_payer': is_payer if off_balance_type == 'swap' else None,
                 'utilized_amount': float(utilized_amount) if utilized_amount else None,
                 'available_amount': float(available_amount) if available_amount else None,
+                'trading_portfolio': trading_portfolio,
                 'data_source': 'mock_generator',
                 'version': '1.0',
             }
