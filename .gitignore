@@ -50,5 +50,6 @@ dmypy.json
 
 # ALM Calculator specific
 output/*.csv
+output/*.xlsx
 !output/.gitkeep
 *.log
