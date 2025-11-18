@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 from datetime import date, timedelta
 from decimal import Decimal
 import pandas as pd
+import numpy as np
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, RiskContribution
@@ -21,272 +22,153 @@ class SurvivalHorizonCalculator:
     """
     Калькулятор горизонта выживания.
 
-    Методология:
-    1. Собирает все inflows и outflows по временным бакетам
-    2. Рассчитывает кумулятивный gap ликвидности
-    3. Определяет дату, когда кумулятивный gap становится отрицательным
-    4. Учитывает доступные ликвидные активы (буфер ликвидности)
+    Методология (по модели вашего кода):
+    1. Собирает все денежные потоки по дням для трех сценариев: NAME, MARKET, COMBO
+    2. Добавляет буфер ликвидности как нулевой день
+    3. Рассчитывает кумулятивный gap ликвидности
+    4. Определяет горизонт выживания как первый день, когда кумулятивная позиция <= 0
+    5. Если горизонт < 0 или > max_horizon_days, устанавливает max_horizon_days
+
+    Сценарии:
+    - NAME: консервативный сценарий (именной/name-based)
+    - MARKET: рыночный сценарий
+    - COMBO: комбинированный сценарий (обычно самый стрессовый)
     """
 
     def __init__(
         self,
         calculation_date: date,
-        liquidity_buckets: List[str],
-        stress_scenario: Optional[str] = None
+        max_horizon_days: int = 90,
+        scenarios: Optional[List[str]] = None
     ):
         """
         Args:
             calculation_date: Дата расчета
-            liquidity_buckets: Временные корзины для анализа ликвидности
-            stress_scenario: Сценарий стресса ('base', 'moderate', 'severe')
+            max_horizon_days: Максимальный горизонт выживания в днях (по умолчанию 90)
+            scenarios: Список сценариев для расчета (по умолчанию ['NAME', 'MARKET', 'COMBO'])
         """
         self.calculation_date = calculation_date
-        self.liquidity_buckets = liquidity_buckets
-        self.stress_scenario = stress_scenario or 'base'
+        self.max_horizon_days = max_horizon_days
+        self.scenarios = scenarios or ['NAME', 'MARKET', 'COMBO']
 
     def calculate(
         self,
-        instruments: List[BaseInstrument],
-        risk_params: Dict,
-        liquid_assets_buffer: Optional[Decimal] = None
+        daily_flows: pd.DataFrame,
+        buffer: Dict[str, float],
+        exclude_from_buffer: Optional[List[str]] = None
     ) -> Dict:
         """
-        Рассчитывает горизонт выживания.
+        Рассчитывает горизонт выживания по дневным потокам.
 
         Args:
-            instruments: Список инструментов
-            risk_params: Параметры расчета рисков
-            liquid_assets_buffer: Буфер высоколиквидных активов (HLA)
+            daily_flows: DataFrame с дневными потоками по сценариям
+                Обязательные колонки: FLOW_DAY (int), NAME, MARKET, COMBO (все в рублях)
+                Опциональные: IN_BUFFER (флаг для исключения из расчета горизонта)
+            buffer: Словарь с буфером ликвидности:
+                {
+                    'VALUE': float,  # Полная стоимость буфера
+                    'IMPAIRMENT': float  # Обесценение (опционально)
+                }
+            exclude_from_buffer: Список названий сценариев для исключения потоков
+                с флагом IN_BUFFER=1 (по умолчанию None - не исключаем)
 
         Returns:
             Словарь с результатами:
             {
-                'survival_horizon_days': int,
-                'survival_horizon_date': date,
-                'cumulative_gaps': pd.DataFrame,
-                'liquid_assets_buffer': Decimal,
-                'critical_bucket': str
+                'horizon_days': {
+                    'NAME': int,
+                    'MARKET': int,
+                    'COMBO': int
+                },
+                'cumulative_report': pd.DataFrame,  # Отчет с кумулятивными позициями
+                'calculation_date': date,
+                'buffer_value': float,
+                'buffer_impaired_value': float
             }
         """
         logger.info(
             f"Starting survival horizon calculation",
             extra={
                 'calculation_date': str(self.calculation_date),
-                'stress_scenario': self.stress_scenario,
-                'instruments_count': len(instruments)
+                'scenarios': self.scenarios,
+                'flows_count': len(daily_flows)
             }
         )
 
-        # 1. Собираем cash flows по всем инструментам
-        cash_flows_by_currency = self._collect_cash_flows(instruments, risk_params)
+        # Фильтруем потоки (исключаем IN_BUFFER если нужно)
+        if exclude_from_buffer and 'IN_BUFFER' in daily_flows.columns:
+            flows_for_horizon = daily_flows[daily_flows['IN_BUFFER'] == 0].copy()
+        else:
+            flows_for_horizon = daily_flows.copy()
 
-        # 2. Для каждой валюты рассчитываем горизонт выживания
-        results_by_currency = {}
+        # Группируем потоки по дням и сценариям
+        scenario_columns = [s for s in self.scenarios if s in flows_for_horizon.columns]
 
-        for currency, cash_flows in cash_flows_by_currency.items():
-            # Применяем стресс-коэффициенты
-            stressed_cash_flows = self._apply_stress_scenario(cash_flows)
+        grouped_flows = flows_for_horizon.groupby('FLOW_DAY')[scenario_columns].sum()
+        grouped_flows = grouped_flows.sort_index()
 
-            # Рассчитываем кумулятивные гэпы
-            cumulative_gaps = self._calculate_cumulative_gaps(stressed_cash_flows)
+        # Определяем буфер
+        buffer_value = buffer.get('VALUE', 0.0)
+        buffer_impairment = buffer.get('IMPAIRMENT', 0.0)
+        buffer_impaired_value = buffer_value - buffer_impairment
 
-            # Определяем буфер ликвидных активов для этой валюты
-            currency_buffer = liquid_assets_buffer if currency == 'RUB' else Decimal(0)
-            # TODO: Распределить buffer по валютам
+        # Создаем строку с буфером (день 0)
+        buffer_row = pd.DataFrame(
+            [[buffer_value] * len(scenario_columns)],
+            columns=scenario_columns,
+            index=[0]
+        )
 
-            # Находим горизонт выживания
-            horizon_result = self._determine_survival_horizon(
-                cumulative_gaps,
-                currency_buffer
-            )
+        # Для консервативных сценариев используем обесцененную стоимость
+        if 'MARKET' in scenario_columns:
+            buffer_row.at[0, 'MARKET'] = buffer_impaired_value
+        if 'COMBO' in scenario_columns:
+            buffer_row.at[0, 'COMBO'] = buffer_impaired_value
 
-            results_by_currency[currency] = {
-                'survival_horizon_days': horizon_result['days'],
-                'survival_horizon_date': horizon_result['date'],
-                'cumulative_gaps': cumulative_gaps,
-                'liquid_assets_buffer': currency_buffer,
-                'critical_bucket': horizon_result['critical_bucket']
-            }
+        # Добавляем буфер к потокам
+        report = pd.concat([buffer_row, grouped_flows], ignore_index=False)
+        report = report.fillna(0)
+
+        # Считаем кумулятивную сумму
+        cumsum_report = report.cumsum()
+        cumsum_report['FLOW_DAY'] = np.arange(len(cumsum_report))
+        cumsum_report['FLOW_DATE'] = [
+            self.calculation_date + timedelta(days=int(day))
+            for day in cumsum_report['FLOW_DAY']
+        ]
+        cumsum_report['REPORT_DATE'] = self.calculation_date
+
+        # Рассчитываем горизонт выживания для каждого сценария
+        horizon_days = {}
+
+        for scenario in scenario_columns:
+            # Находим первый день, когда кумулятивная позиция становится <= 0
+            # np.argmin находит первый индекс, где условие True
+            horizon = np.argmin(cumsum_report[scenario].values > 0) - 1
+
+            # Применяем ограничения
+            if horizon < 0 or horizon > self.max_horizon_days:
+                horizon = self.max_horizon_days
+
+            horizon_days[scenario] = int(horizon)
 
             logger.info(
-                f"Survival horizon for {currency}: {horizon_result['days']} days",
+                f"Survival horizon for {scenario}: {horizon} days",
                 extra={
-                    'currency': currency,
-                    'survival_days': horizon_result['days'],
-                    'survival_date': str(horizon_result['date']),
-                    'buffer': float(currency_buffer)
+                    'scenario': scenario,
+                    'survival_days': int(horizon),
+                    'buffer': buffer_value
                 }
             )
 
-        # 3. Определяем минимальный горизонт (самая критичная валюта)
-        min_horizon = min(
-            r['survival_horizon_days']
-            for r in results_by_currency.values()
-        )
-
         return {
-            'overall_survival_horizon_days': min_horizon,
-            'by_currency': results_by_currency,
-            'stress_scenario': self.stress_scenario,
-            'calculation_date': self.calculation_date
+            'horizon_days': horizon_days,
+            'cumulative_report': cumsum_report,
+            'calculation_date': self.calculation_date,
+            'buffer_value': buffer_value,
+            'buffer_impaired_value': buffer_impaired_value
         }
 
-    def _collect_cash_flows(
-        self,
-        instruments: List[BaseInstrument],
-        risk_params: Dict
-    ) -> Dict[str, pd.DataFrame]:
-        """
-        Собирает cash flows по всем инструментам, группируя по валютам.
-
-        Returns:
-            Dict[currency, DataFrame] с колонками [bucket, inflow, outflow, net_flow]
-        """
-        cash_flows_by_currency = {}
-
-        for instrument in instruments:
-            # Рассчитываем risk contribution для инструмента
-            contribution = instrument.calculate_risk_contribution(
-                self.calculation_date,
-                risk_params
-            )
-
-            # Группируем cash flows по валюте
-            for currency, exposure in contribution.currency_exposure.items():
-                if currency not in cash_flows_by_currency:
-                    cash_flows_by_currency[currency] = {
-                        bucket: {'inflow': Decimal(0), 'outflow': Decimal(0)}
-                        for bucket in self.liquidity_buckets
-                    }
-
-                # Распределяем cash flows по бакетам
-                for bucket, cf_amount in contribution.cash_flows.items():
-                    if bucket not in cash_flows_by_currency[currency]:
-                        cash_flows_by_currency[currency][bucket] = {
-                            'inflow': Decimal(0),
-                            'outflow': Decimal(0)
-                        }
-
-                    if cf_amount > 0:
-                        cash_flows_by_currency[currency][bucket]['inflow'] += cf_amount
-                    else:
-                        cash_flows_by_currency[currency][bucket]['outflow'] += abs(cf_amount)
-
-        # Конвертируем в DataFrame
-        result = {}
-        for currency, buckets_data in cash_flows_by_currency.items():
-            df_data = []
-            for bucket in self.liquidity_buckets:
-                bucket_data = buckets_data.get(bucket, {'inflow': Decimal(0), 'outflow': Decimal(0)})
-                df_data.append({
-                    'bucket': bucket,
-                    'inflow': float(bucket_data['inflow']),
-                    'outflow': float(bucket_data['outflow']),
-                    'net_flow': float(bucket_data['inflow'] - bucket_data['outflow'])
-                })
-
-            result[currency] = pd.DataFrame(df_data)
-
-        return result
-
-    def _apply_stress_scenario(self, cash_flows: pd.DataFrame) -> pd.DataFrame:
-        """
-        Применяет стресс-коэффициенты к денежным потокам.
-
-        Стресс сценарии:
-        - base: без изменений
-        - moderate: inflows -20%, outflows +10%
-        - severe: inflows -40%, outflows +30%
-        """
-        stressed_cf = cash_flows.copy()
-
-        if self.stress_scenario == 'moderate':
-            stressed_cf['inflow'] = stressed_cf['inflow'] * 0.80  # -20%
-            stressed_cf['outflow'] = stressed_cf['outflow'] * 1.10  # +10%
-        elif self.stress_scenario == 'severe':
-            stressed_cf['inflow'] = stressed_cf['inflow'] * 0.60  # -40%
-            stressed_cf['outflow'] = stressed_cf['outflow'] * 1.30  # +30%
-
-        # Пересчитываем net flow
-        stressed_cf['net_flow'] = stressed_cf['inflow'] - stressed_cf['outflow']
-
-        return stressed_cf
-
-    def _calculate_cumulative_gaps(self, cash_flows: pd.DataFrame) -> pd.DataFrame:
-        """
-        Рассчитывает кумулятивные гэпы ликвидности.
-
-        Returns:
-            DataFrame с дополнительной колонкой 'cumulative_gap'
-        """
-        gaps = cash_flows.copy()
-        gaps['cumulative_gap'] = gaps['net_flow'].cumsum()
-
-        return gaps
-
-    def _determine_survival_horizon(
-        self,
-        cumulative_gaps: pd.DataFrame,
-        liquid_assets_buffer: Decimal
-    ) -> Dict:
-        """
-        Определяет горизонт выживания.
-
-        Логика:
-        - Начинаем с буфера ликвидных активов
-        - Добавляем кумулятивный gap на каждую дату
-        - Находим первую дату, когда позиция становится отрицательной
-
-        Returns:
-            {
-                'days': int,
-                'date': date,
-                'critical_bucket': str
-            }
-        """
-        buffer = float(liquid_assets_buffer)
-
-        for idx, row in cumulative_gaps.iterrows():
-            cumulative_position = buffer + row['cumulative_gap']
-
-            if cumulative_position < 0:
-                # Достигли отрицательной позиции
-                critical_bucket = row['bucket']
-                days_to_critical = self._bucket_to_days(critical_bucket)
-
-                return {
-                    'days': days_to_critical,
-                    'date': self.calculation_date + timedelta(days=days_to_critical),
-                    'critical_bucket': critical_bucket
-                }
-
-        # Если не достигли отрицательной позиции - горизонт выживания > последний бакет
-        last_bucket = cumulative_gaps.iloc[-1]['bucket']
-        last_bucket_days = self._bucket_to_days(last_bucket)
-
-        return {
-            'days': last_bucket_days,
-            'date': self.calculation_date + timedelta(days=last_bucket_days),
-            'critical_bucket': f'{last_bucket}+'
-        }
-
-    def _bucket_to_days(self, bucket: str) -> int:
-        """
-        Конвертирует название бакета в количество дней (конец периода бакета).
-        """
-        bucket_mapping = {
-            'overnight': 1,
-            '2-7d': 7,
-            '8-14d': 14,
-            '15-30d': 30,
-            '30-90d': 90,
-            '90-180d': 180,
-            '180-365d': 365,
-            '1-2y': 730,
-            '2y+': 1095
-        }
-
-        return bucket_mapping.get(bucket, 30)
 
 
 def export_to_excel(results: Dict, output_path: str) -> None:
@@ -294,7 +176,14 @@ def export_to_excel(results: Dict, output_path: str) -> None:
     Экспортирует результаты в Excel для анализа.
 
     Args:
-        results: Результаты расчета от SurvivalHorizonCalculator
+        results: Результаты расчета от SurvivalHorizonCalculator.calculate()
+            {
+                'horizon_days': {'NAME': int, 'MARKET': int, 'COMBO': int},
+                'cumulative_report': pd.DataFrame,
+                'calculation_date': date,
+                'buffer_value': float,
+                'buffer_impaired_value': float
+            }
         output_path: Путь к выходному Excel файлу
     """
     import openpyxl
@@ -313,43 +202,45 @@ def export_to_excel(results: Dict, output_path: str) -> None:
     ws_summary['A3'] = "Calculation Date:"
     ws_summary['B3'] = results['calculation_date'].strftime('%Y-%m-%d')
 
-    ws_summary['A4'] = "Stress Scenario:"
-    ws_summary['B4'] = results['stress_scenario']
+    ws_summary['A4'] = "Liquid Assets Buffer:"
+    ws_summary['B4'] = results['buffer_value']
 
-    ws_summary['A5'] = "Overall Survival Horizon (days):"
-    ws_summary['B5'] = results['overall_survival_horizon_days']
-    ws_summary['B5'].font = Font(bold=True, color="FF0000" if results['overall_survival_horizon_days'] < 30 else "000000")
+    ws_summary['A5'] = "Buffer (impaired):"
+    ws_summary['B5'] = results['buffer_impaired_value']
 
-    # Лист 2+: По каждой валюте
-    for currency, currency_result in results['by_currency'].items():
-        ws = wb.create_sheet(title=f"Currency_{currency}")
+    # Горизонты выживания по сценариям
+    ws_summary['A7'] = "Survival Horizon (days) by Scenario:"
+    ws_summary['A7'].font = Font(bold=True)
 
-        ws['A1'] = f"Survival Horizon - {currency}"
-        ws['A1'].font = Font(size=12, bold=True)
+    row_idx = 8
+    min_horizon = min(results['horizon_days'].values())
 
-        ws['A3'] = "Survival Horizon (days):"
-        ws['B3'] = currency_result['survival_horizon_days']
+    for scenario, horizon in results['horizon_days'].items():
+        ws_summary[f'A{row_idx}'] = f"{scenario}:"
+        ws_summary[f'B{row_idx}'] = horizon
 
-        ws['A4'] = "Survival Date:"
-        ws['B4'] = currency_result['survival_horizon_date'].strftime('%Y-%m-%d')
+        # Выделяем красным если < 30 дней
+        if horizon < 30:
+            ws_summary[f'B{row_idx}'].font = Font(bold=True, color="FF0000")
+        elif horizon == min_horizon:
+            ws_summary[f'B{row_idx}'].font = Font(bold=True)
 
-        ws['A5'] = "Critical Bucket:"
-        ws['B5'] = currency_result['critical_bucket']
+        row_idx += 1
 
-        ws['A6'] = "Liquid Assets Buffer:"
-        ws['B6'] = float(currency_result['liquid_assets_buffer'])
+    # Лист 2: Cumulative Report
+    ws_report = wb.create_sheet(title="Cumulative Report")
 
-        # Cumulative gaps table
-        ws['A8'] = "Cumulative Gaps Analysis"
-        ws['A8'].font = Font(bold=True)
+    ws_report['A1'] = "Cumulative Liquidity Positions"
+    ws_report['A1'].font = Font(size=12, bold=True)
 
-        cumulative_gaps = currency_result['cumulative_gaps']
-        for r_idx, row in enumerate(dataframe_to_rows(cumulative_gaps, index=False, header=True), 9):
-            for c_idx, value in enumerate(row, 1):
-                cell = ws.cell(row=r_idx, column=c_idx, value=value)
-                if r_idx == 9:  # Header
-                    cell.font = Font(bold=True)
-                    cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+    # Таблица с кумулятивными позициями
+    cumulative_report = results['cumulative_report']
+    for r_idx, row in enumerate(dataframe_to_rows(cumulative_report, index=False, header=True), 3):
+        for c_idx, value in enumerate(row, 1):
+            cell = ws_report.cell(row=r_idx, column=c_idx, value=value)
+            if r_idx == 3:  # Header
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
 
     wb.save(output_path)
     logger.info(f"Survival horizon results exported to {output_path}")
