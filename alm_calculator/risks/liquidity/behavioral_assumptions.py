@@ -135,6 +135,16 @@ class CounterpartyAssumption:
     overnight_treatment: bool = False  # Рассматривать как overnight (1 день)
     full_outflow: bool = False  # 100% отток
 
+    # Параметры эластичности для процентного риска
+    elasticity_enabled: bool = False  # Включить моделирование эластичности
+    base_elasticity: Optional[float] = None  # Базовая эластичность объема к ставке
+    elasticity_asymmetric: bool = False  # Асимметричная реакция на рост/падение ставок
+    elasticity_positive_shock: Optional[float] = None  # Эластичность при росте ставок
+    elasticity_negative_shock: Optional[float] = None  # Эластичность при падении ставок
+    elasticity_threshold: Optional[float] = None  # Порог изменения ставки (в п.п.)
+    elasticity_adjustment_speed: Optional[float] = None  # Скорость адаптации (0-1)
+    elasticity_max_change: Optional[float] = None  # Максимальное изменение объема (доля)
+
 
 class BehavioralAssumptionsManager:
     """
@@ -243,6 +253,29 @@ class BehavioralAssumptionsManager:
 
         if cp_assumption.full_outflow:
             result['runoff_override'] = 1.0  # 100% отток
+
+        # Параметры эластичности
+        if cp_assumption.elasticity_enabled:
+            result['elasticity_enabled'] = True
+
+            if cp_assumption.base_elasticity is not None:
+                result['base_elasticity'] = cp_assumption.base_elasticity
+
+            if cp_assumption.elasticity_asymmetric:
+                result['elasticity_asymmetric'] = True
+                if cp_assumption.elasticity_positive_shock is not None:
+                    result['elasticity_positive_shock'] = cp_assumption.elasticity_positive_shock
+                if cp_assumption.elasticity_negative_shock is not None:
+                    result['elasticity_negative_shock'] = cp_assumption.elasticity_negative_shock
+
+            if cp_assumption.elasticity_threshold is not None:
+                result['elasticity_threshold'] = cp_assumption.elasticity_threshold
+
+            if cp_assumption.elasticity_adjustment_speed is not None:
+                result['elasticity_adjustment_speed'] = cp_assumption.elasticity_adjustment_speed
+
+            if cp_assumption.elasticity_max_change is not None:
+                result['elasticity_max_change'] = cp_assumption.elasticity_max_change
 
         return result
 
