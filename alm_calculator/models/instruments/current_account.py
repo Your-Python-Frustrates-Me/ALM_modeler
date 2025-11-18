@@ -4,7 +4,7 @@ Current Account instrument implementation
 """
 from typing import Dict, Optional
 from datetime import date, timedelta
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -38,7 +38,7 @@ class CurrentAccount(BaseInstrument):
 
     # Специфичные атрибуты
     is_transactional: bool = True  # Является ли счет транзакционным
-    avg_balance_30d: Optional[Decimal] = None  # Средний остаток за 30 дней
+    avg_balance_30d: Optional[float] = None  # Средний остаток за 30 дней
     volatility_coefficient: Optional[float] = None  # Коэффициент волатильности остатков
     stable_portion: Optional[float] = None  # Устойчивая часть остатка (0-1)
     avg_life_days: Optional[int] = None  # Условный срок жизни устойчивой части
@@ -66,7 +66,7 @@ class CurrentAccount(BaseInstrument):
             # Устойчивая часть имеет условный срок
             repricing_days = self.avg_life_days
             contribution.repricing_date = calculation_date + timedelta(days=repricing_days)
-            contribution.repricing_amount = -self.amount * Decimal(self.stable_portion)
+            contribution.repricing_amount = -self.amount * float(self.stable_portion)
         else:
             # По умолчанию: очень короткий repricing (1 день)
             contribution.repricing_date = calculation_date + timedelta(days=1)
@@ -79,7 +79,7 @@ class CurrentAccount(BaseInstrument):
             if self.interest_rate:
                 contribution.modified_duration = contribution.duration / (1 + self.interest_rate)
                 # Пассив - отрицательный DV01
-                contribution.dv01 = -self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001)
+                contribution.dv01 = -self.amount * float(contribution.modified_duration) * float(0.0001)
 
         # === Liquidity Risk ===
         # Текущие счета - критичный компонент для ликвидности
@@ -92,7 +92,7 @@ class CurrentAccount(BaseInstrument):
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
             # Текущие счета - это outflow (могут быть изъяты)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # Текущие счета - пассив
@@ -114,7 +114,7 @@ class CurrentAccount(BaseInstrument):
         self,
         calculation_date: date,
         assumptions: Optional[Dict] = None
-    ) -> Dict[date, Decimal]:
+    ) -> Dict[date, float]:
         """
         Генерирует денежные потоки текущего счета с учетом behavioral assumptions.
 
@@ -126,8 +126,8 @@ class CurrentAccount(BaseInstrument):
 
         # Определяем stable и unstable части
         stable_portion = self.stable_portion if self.stable_portion is not None else 0.3  # Default 30%
-        unstable_amount = self.amount * Decimal(1 - stable_portion)
-        stable_amount = self.amount * Decimal(stable_portion)
+        unstable_amount = self.amount * float(1 - stable_portion)
+        stable_amount = self.amount * float(stable_portion)
 
         # Unstable часть: применяем runoff rates
         if assumptions and 'runoff_rates' in assumptions:
@@ -135,16 +135,16 @@ class CurrentAccount(BaseInstrument):
             remaining = unstable_amount
 
             for bucket, rate in sorted(runoff_rates.items()):
-                runoff_amount = remaining * Decimal(rate)
+                runoff_amount = remaining * float(rate)
                 bucket_date = self._bucket_to_date(calculation_date, bucket)
                 # Outflow (отток средств)
-                cash_flows[bucket_date] = cash_flows.get(bucket_date, Decimal(0)) - runoff_amount
+                cash_flows[bucket_date] = cash_flows.get(bucket_date, 0.0) - runoff_amount
                 remaining -= runoff_amount
 
             # Остаток unstable части через 30 дней
             if remaining > 0:
                 cash_flows[calculation_date + timedelta(days=30)] = \
-                    cash_flows.get(calculation_date + timedelta(days=30), Decimal(0)) - remaining
+                    cash_flows.get(calculation_date + timedelta(days=30), 0.0) - remaining
         else:
             # По умолчанию: unstable часть может быть изъята моментально
             cash_flows[calculation_date + timedelta(days=1)] = -unstable_amount
@@ -152,7 +152,7 @@ class CurrentAccount(BaseInstrument):
         # Stable часть: остается на условный срок
         stable_days = self.avg_life_days if self.avg_life_days else 180  # Default 180 дней
         stable_date = calculation_date + timedelta(days=stable_days)
-        cash_flows[stable_date] = cash_flows.get(stable_date, Decimal(0)) - stable_amount
+        cash_flows[stable_date] = cash_flows.get(stable_date, 0.0) - stable_amount
 
         return cash_flows
 

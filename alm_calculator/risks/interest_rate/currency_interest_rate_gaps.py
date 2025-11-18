@@ -129,8 +129,8 @@ class CurrencyInterestRateGapCalculator:
 
         Returns:
             Dict[currency, {
-                'nii_impact_1y': Decimal,  # Влияние на NII за год
-                'eve_impact': Decimal,      # Влияние на EVE (упрощенно)
+                'nii_impact_1y': float,  # Влияние на NII за год
+                'eve_impact': float,      # Влияние на EVE (упрощенно)
                 'gap_limits_breached': bool
             }]
         """
@@ -207,12 +207,12 @@ class CurrencyInterestRateGapCalculator:
         self,
         instruments: List[BaseInstrument],
         risk_params: Dict
-    ) -> Dict[str, Dict[str, Dict[str, Decimal]]]:
+    ) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Собирает repricing amounts по валютам и временным бакетам.
 
         Returns:
-            Dict[currency, Dict[bucket, {'rsa': Decimal, 'rsl': Decimal}]]
+            Dict[currency, Dict[bucket, {'rsa': float, 'rsl': float}]]
         """
         repricing_data = {}
 
@@ -287,7 +287,7 @@ class CurrencyInterestRateGapCalculator:
     def _calculate_gaps_for_currency(
         self,
         currency: str,
-        repricing_data: Dict[str, Dict[str, Decimal]]
+        repricing_data: Dict[str, Dict[str, float]]
     ) -> pd.DataFrame:
         """
         Рассчитывает процентные гэпы для одной валюты.

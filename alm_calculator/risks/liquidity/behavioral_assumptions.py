@@ -124,8 +124,8 @@ class CounterpartyAssumption:
     runoff_rates: Optional[Dict[str, Dict[str, float]]] = None  # {scenario: {bucket: rate}}
 
     # Минимальный остаток
-    minimum_balance: Optional[Decimal] = None
-    maximum_outflow: Optional[Decimal] = None  # Максимальный отток
+    minimum_balance: Optional[float] = None
+    maximum_outflow: Optional[float] = None  # Максимальный отток
 
     # Параметры досрочного изъятия
     early_withdrawal_probability: Optional[float] = None  # Вероятность досрочного изъятия
@@ -190,7 +190,7 @@ class BehavioralAssumptionsManager:
                     'instrument_class': str,
                     'instrument_subclass': str,
                     'currency': str,
-                    'amount': Decimal,
+                    'amount': float,
                     'maturity_days': int,
                     ...
                 }

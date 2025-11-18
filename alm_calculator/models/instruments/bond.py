@@ -4,7 +4,7 @@ Bond instrument implementation
 """
 from typing import Dict, Optional
 from datetime import date
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -28,8 +28,8 @@ class Bond(BaseInstrument):
 
     # Специфичные атрибуты облигаций
     isin: Optional[str] = None  # ISIN облигации
-    nominal_value: Optional[Decimal] = None  # Номинал одной облигации
-    quantity: Optional[Decimal] = None  # Количество облигаций
+    nominal_value: Optional[float] = None  # Номинал одной облигации
+    quantity: Optional[float] = None  # Количество облигаций
     coupon_rate: Optional[float] = None  # Купонная ставка
     coupon_frequency: Optional[int] = None  # Частота купонных выплат в днях
 
@@ -52,8 +52,8 @@ class Bond(BaseInstrument):
     date_close: Optional[date] = None  # Дата погашения облигации
 
     # Рыночная информация
-    market_price: Optional[Decimal] = None  # Рыночная цена облигации (в % от номинала)
-    accrued_interest: Optional[Decimal] = None  # Накопленный купонный доход
+    market_price: Optional[float] = None  # Рыночная цена облигации (в % от номинала)
+    accrued_interest: Optional[float] = None  # Накопленный купонный доход
 
     def calculate_risk_contribution(
         self,
@@ -89,7 +89,7 @@ class Bond(BaseInstrument):
             )
             contribution.modified_duration = contribution.duration / (1 + self.coupon_rate)
             # Актив - положительный DV01
-            contribution.dv01 = self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001)
+            contribution.dv01 = self.amount * float(contribution.modified_duration) * float(0.0001)
 
         # === Liquidity Risk ===
         cash_flows = self._generate_cash_flows(calculation_date)
@@ -100,7 +100,7 @@ class Bond(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # Облигация - актив
@@ -148,7 +148,7 @@ class Bond(BaseInstrument):
             # Без купонов - duration равна сроку
             return years_to_maturity
 
-    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, Decimal]:
+    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, float]:
         """
         Генерирует денежные потоки облигации.
 
@@ -162,7 +162,7 @@ class Bond(BaseInstrument):
 
         # Генерация купонных выплат
         if self.coupon_frequency and self.coupon_rate and self.nominal_value and self.quantity:
-            coupon_payment = self.nominal_value * Decimal(self.coupon_rate) * self.quantity * Decimal(self.coupon_frequency / 365.0)
+            coupon_payment = self.nominal_value * float(self.coupon_rate) * self.quantity * float(self.coupon_frequency / 365.0)
 
             # Генерируем даты купонных выплат
             current_date = calculation_date
@@ -170,14 +170,14 @@ class Bond(BaseInstrument):
                 from datetime import timedelta
                 current_date = current_date + timedelta(days=self.coupon_frequency)
                 if current_date <= maturity:
-                    cash_flows[current_date] = cash_flows.get(current_date, Decimal(0)) + coupon_payment
+                    cash_flows[current_date] = cash_flows.get(current_date, 0.0) + coupon_payment
 
         # Погашение номинала в дату погашения
         if maturity >= calculation_date:
             redemption_amount = self.amount  # Используем балансовую стоимость
             if self.nominal_value and self.quantity:
                 redemption_amount = self.nominal_value * self.quantity
-            cash_flows[maturity] = cash_flows.get(maturity, Decimal(0)) + redemption_amount
+            cash_flows[maturity] = cash_flows.get(maturity, 0.0) + redemption_amount
 
         return cash_flows
 

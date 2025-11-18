@@ -342,12 +342,12 @@ class FactorAnalyzer:
         Рассчитывает изменение метрики.
 
         Обрабатывает разные типы метрик:
-        - Числа (int, float, Decimal)
+        - Числа (int, float)
         - Словари (рекурсивно)
         - DataFrames (по ключевым столбцам)
         """
         # Числовые метрики
-        if isinstance(metric_new, (int, float, Decimal, np.number)):
+        if isinstance(metric_new, (int, float, np.number)):
             return metric_new - metric_old
 
         # Словари (например, {'RUB': 30, 'USD': 25})
@@ -374,7 +374,7 @@ class FactorAnalyzer:
         if metric is None:
             return "N/A"
 
-        if isinstance(metric, (int, float, Decimal, np.number)):
+        if isinstance(metric, (int, float, np.number)):
             return f"{metric:,.2f}"
 
         if isinstance(metric, dict):
@@ -384,12 +384,12 @@ class FactorAnalyzer:
 
     def _get_impact_magnitude(self, impact: Any) -> float:
         """Получает абсолютную величину влияния для сортировки"""
-        if isinstance(impact, (int, float, Decimal, np.number)):
+        if isinstance(impact, (int, float, np.number)):
             return abs(float(impact))
 
         if isinstance(impact, dict):
             # Для словаря берем сумму абсолютных величин
-            return sum(abs(float(v)) for v in impact.values() if isinstance(v, (int, float, Decimal, np.number)))
+            return sum(abs(float(v)) for v in impact.values() if isinstance(v, (int, float, np.number)))
 
         return 0.0
 

@@ -108,8 +108,8 @@ class DynamicBalanceIRRCalculator:
                 },
                 'comparison': {  # Сравнение
                     'gap_differences': Dict[currency, DataFrame],
-                    'nii_impact_difference': Dict[currency, Decimal],
-                    'eve_impact_difference': Dict[currency, Decimal]
+                    'nii_impact_difference': Dict[currency, float],
+                    'eve_impact_difference': Dict[currency, float]
                 }
             }
         """

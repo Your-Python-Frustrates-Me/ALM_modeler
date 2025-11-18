@@ -4,7 +4,7 @@ Off-Balance Sheet Instruments implementation
 """
 from typing import Dict, Optional
 from datetime import date, timedelta
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -40,7 +40,7 @@ class OffBalanceInstrument(BaseInstrument):
     off_balance_type: str  # 'guarantee', 'credit_line', 'forward', 'swap', 'option', 'other'
 
     # Notional amount (условная сумма)
-    notional_amount: Decimal  # Для деривативов - notional
+    notional_amount: float  # Для деривативов - notional
 
     # Параметры исполнения
     draw_down_probability: Optional[float] = None  # Вероятность использования (для гарантий, кредитных линий)
@@ -51,13 +51,13 @@ class OffBalanceInstrument(BaseInstrument):
     derivative_type: Optional[str] = None  # 'IRS', 'XCCY_SWAP', 'FX_FORWARD', 'FX_OPTION', etc.
     pay_leg_currency: Optional[str] = None  # Валюта платежной ноги
     receive_leg_currency: Optional[str] = None  # Валюта получаемой ноги
-    pay_leg_amount: Optional[Decimal] = None
-    receive_leg_amount: Optional[Decimal] = None
+    pay_leg_amount: Optional[float] = None
+    receive_leg_amount: Optional[float] = None
     is_payer: Optional[bool] = None  # True - платим fixed (IRS), False - получаем fixed
 
     # Для гарантий и кредитных линий
-    utilized_amount: Optional[Decimal] = None  # Уже использованная часть
-    available_amount: Optional[Decimal] = None  # Доступная к использованию
+    utilized_amount: Optional[float] = None  # Уже использованная часть
+    available_amount: Optional[float] = None  # Доступная к использованию
 
     def calculate_risk_contribution(
         self,
@@ -107,7 +107,7 @@ class OffBalanceInstrument(BaseInstrument):
         # === Interest Rate Risk ===
         # Минимальный IRR для contingent (пока не задействованы)
         contribution.repricing_date = None
-        contribution.repricing_amount = Decimal(0)
+        contribution.repricing_amount = 0.0
 
         # === Liquidity Risk ===
         # Потенциальный outflow при исполнении обязательства
@@ -117,9 +117,9 @@ class OffBalanceInstrument(BaseInstrument):
         draw_down_prob = self.draw_down_probability if self.draw_down_probability else 0.5  # Default 50%
 
         if self.available_amount:
-            expected_draw_down = self.available_amount * Decimal(draw_down_prob)
+            expected_draw_down = self.available_amount * float(draw_down_prob)
         else:
-            expected_draw_down = self.notional_amount * Decimal(draw_down_prob)
+            expected_draw_down = self.notional_amount * float(draw_down_prob)
 
         # Дата потенциального использования
         if self.settlement_date:
@@ -141,7 +141,7 @@ class OffBalanceInstrument(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # Гарантии в валюте создают потенциальную валютную позицию
@@ -174,7 +174,7 @@ class OffBalanceInstrument(BaseInstrument):
                 contribution.duration = years
                 contribution.modified_duration = years / (1 + self.interest_rate)
                 dv01_sign = -1 if self.is_payer else 1
-                contribution.dv01 = self.notional_amount * Decimal(contribution.modified_duration) * Decimal(0.0001) * dv01_sign
+                contribution.dv01 = self.notional_amount * float(contribution.modified_duration) * float(0.0001) * dv01_sign
 
         # === Liquidity Risk ===
         cash_flows = {}
@@ -193,7 +193,7 @@ class OffBalanceInstrument(BaseInstrument):
             if self.settlement_date:
                 # Net CF свопа (приближенно)
                 # В реальности нужно моделировать все купонные платежи
-                net_cf = Decimal(0)  # Placeholder
+                net_cf = 0.0  # Placeholder
                 cash_flows[self.settlement_date] = net_cf
 
         liquidity_buckets = risk_params.get('liquidity_buckets', [
@@ -202,7 +202,7 @@ class OffBalanceInstrument(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         if self.off_balance_type == 'forward' or self.derivative_type == 'XCCY_SWAP':
@@ -234,7 +234,7 @@ class OffBalanceInstrument(BaseInstrument):
         # Потенциальный CF при исполнении (delta ~0.5 для ATM)
         if self.expiry_date:
             delta = 0.5  # Simplified assumption
-            potential_cf = self.notional_amount * Decimal(delta)
+            potential_cf = self.notional_amount * float(delta)
 
             liquidity_buckets = risk_params.get('liquidity_buckets', ['0-30d', '30-90d', '90-180d', '180-365d', '1y+'])
             bucket = assign_to_bucket(calculation_date, self.expiry_date, liquidity_buckets)

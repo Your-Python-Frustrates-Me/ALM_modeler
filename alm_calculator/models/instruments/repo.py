@@ -4,7 +4,7 @@ REPO and Reverse REPO instrument implementation
 """
 from typing import Dict, Optional
 from datetime import date
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -33,7 +33,7 @@ class Repo(BaseInstrument):
     # Специфичные атрибуты
     repo_rate: Optional[float] = None  # Ставка РЕПО (может отличаться от interest_rate)
     collateral_type: Optional[str] = None  # Тип обеспечения (OFZ, Corporate bonds, etc.)
-    collateral_value: Optional[Decimal] = None  # Рыночная стоимость обеспечения
+    collateral_value: Optional[float] = None  # Рыночная стоимость обеспечения
     haircut: Optional[float] = None  # Дисконт обеспечения (обычно 0-20%)
     counterparty_type: str = 'bank'  # Обычно контрагент - банк или ЦБ РФ
 
@@ -59,8 +59,8 @@ class Repo(BaseInstrument):
     collateral_isin: Optional[str] = None  # ISIN переданной бумаги
     collateral_name: Optional[str] = None  # Название переданной бумаги
     collateral_currency: Optional[str] = None  # Валюта переданной бумаги
-    collateral_quantity: Optional[Decimal] = None  # Количество переданных бумаг
-    collateral_price: Optional[Decimal] = None  # Цена/стоимость переданных бумаг
+    collateral_quantity: Optional[float] = None  # Количество переданных бумаг
+    collateral_price: Optional[float] = None  # Цена/стоимость переданных бумаг
 
     # Портфельная принадлежность
     trading_portfolio: Optional[str] = None  # Торговый портфель
@@ -90,7 +90,7 @@ class Repo(BaseInstrument):
             contribution.duration = years_to_maturity
             contribution.modified_duration = years_to_maturity / (1 + self.repo_rate)
             # Пассив - отрицательный DV01
-            contribution.dv01 = -self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001)
+            contribution.dv01 = -self.amount * float(contribution.modified_duration) * float(0.0001)
 
         # === Liquidity Risk ===
         cash_flows = self._generate_cash_flows(calculation_date)
@@ -101,7 +101,7 @@ class Repo(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # РЕПО - пассив
@@ -119,7 +119,7 @@ class Repo(BaseInstrument):
 
         return contribution
 
-    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, Decimal]:
+    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, float]:
         """
         Генерирует денежные потоки РЕПО.
 
@@ -172,7 +172,7 @@ class ReverseRepo(BaseInstrument):
     # Специфичные атрибуты
     repo_rate: Optional[float] = None  # Ставка РЕПО
     collateral_type: Optional[str] = None  # Тип полученного обеспечения
-    collateral_value: Optional[Decimal] = None  # Рыночная стоимость обеспечения
+    collateral_value: Optional[float] = None  # Рыночная стоимость обеспечения
     haircut: Optional[float] = None  # Дисконт обеспечения
     counterparty_type: str = 'bank'  # Обычно контрагент - банк
 
@@ -198,8 +198,8 @@ class ReverseRepo(BaseInstrument):
     collateral_isin: Optional[str] = None  # ISIN полученной бумаги
     collateral_name: Optional[str] = None  # Название полученной бумаги
     collateral_currency: Optional[str] = None  # Валюта полученной бумаги
-    collateral_quantity: Optional[Decimal] = None  # Количество полученных бумаг
-    collateral_price: Optional[Decimal] = None  # Цена/стоимость полученных бумаг
+    collateral_quantity: Optional[float] = None  # Количество полученных бумаг
+    collateral_price: Optional[float] = None  # Цена/стоимость полученных бумаг
 
     # Портфельная принадлежность
     trading_portfolio: Optional[str] = None  # Торговый портфель
@@ -229,7 +229,7 @@ class ReverseRepo(BaseInstrument):
             contribution.duration = years_to_maturity
             contribution.modified_duration = years_to_maturity / (1 + self.repo_rate)
             # Актив - положительный DV01
-            contribution.dv01 = self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001)
+            contribution.dv01 = self.amount * float(contribution.modified_duration) * float(0.0001)
 
         # === Liquidity Risk ===
         cash_flows = self._generate_cash_flows(calculation_date)
@@ -240,7 +240,7 @@ class ReverseRepo(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # Обратное РЕПО - актив
@@ -258,7 +258,7 @@ class ReverseRepo(BaseInstrument):
 
         return contribution
 
-    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, Decimal]:
+    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, float]:
         """
         Генерирует денежные потоки обратного РЕПО.
 

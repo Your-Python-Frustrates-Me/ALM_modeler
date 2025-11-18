@@ -4,7 +4,7 @@ Derivative instruments implementation
 """
 from typing import Dict, Optional
 from datetime import date
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -23,7 +23,7 @@ class BaseDerivative(BaseInstrument):
     instrument_type: InstrumentType = InstrumentType.DERIVATIVE
 
     # Базовые параметры ПФИ
-    notional_amount: Optional[Decimal] = None  # Номинальная стоимость контракта
+    notional_amount: Optional[float] = None  # Номинальная стоимость контракта
     settlement_date: Optional[date] = None  # Дата расчетов/экспирации
     underlying_asset: Optional[str] = None  # Базовый актив
     derivative_type: Optional[str] = None  # Тип деривативa (IRS, FxSwap, etc.)
@@ -49,8 +49,8 @@ class BaseDerivative(BaseInstrument):
     trading_portfolio: Optional[str] = None  # Торговый портфель
 
     # Параметры маржи
-    initial_margin: Optional[Decimal] = None  # Начальная маржа
-    variation_margin: Optional[Decimal] = None  # Вариационная маржа
+    initial_margin: Optional[float] = None  # Начальная маржа
+    variation_margin: Optional[float] = None  # Вариационная маржа
 
     def calculate_risk_contribution(
         self,
@@ -126,7 +126,7 @@ class IRS(BaseDerivative):
             years_to_maturity = (contribution.repricing_date - calculation_date).days / 365.25
             contribution.duration = years_to_maturity / 2  # Приблизительно
             contribution.modified_duration = contribution.duration / (1 + self.fixed_rate)
-            contribution.dv01 = (self.notional_amount or self.amount) * Decimal(contribution.modified_duration) * Decimal(0.0001) * sign
+            contribution.dv01 = (self.notional_amount or self.amount) * float(contribution.modified_duration) * float(0.0001) * sign
 
         # === Liquidity Risk ===
         cash_flows = self._generate_cash_flows(calculation_date)
@@ -136,7 +136,7 @@ class IRS(BaseDerivative):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         contribution.currency_exposure[self.currency] = self.amount
@@ -152,7 +152,7 @@ class IRS(BaseDerivative):
 
         return contribution
 
-    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, Decimal]:
+    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, float]:
         """
         Генерирует денежные потоки IRS.
         Упрощенная модель: нетто CF между фикс и float ногами.
@@ -174,9 +174,9 @@ class FxSwap(BaseDerivative):
     # Параметры валютного свопа
     base_currency: Optional[str] = None  # Базовая валюта
     quote_currency: Optional[str] = None  # Котируемая валюта
-    spot_rate: Optional[Decimal] = None  # Спот курс
-    forward_rate: Optional[Decimal] = None  # Форвардный курс
-    swap_points: Optional[Decimal] = None  # Своп-пойнты
+    spot_rate: Optional[float] = None  # Спот курс
+    forward_rate: Optional[float] = None  # Форвардный курс
+    swap_points: Optional[float] = None  # Своп-пойнты
 
     # Даты
     near_leg_date: Optional[date] = None  # Дата ближней ноги (обычно спот)
@@ -215,7 +215,7 @@ class FxSwap(BaseDerivative):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         logger.debug(
             f"Calculated risk contribution for FxSwap {self.instrument_id}",
@@ -228,7 +228,7 @@ class FxSwap(BaseDerivative):
 
         return contribution
 
-    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, Decimal]:
+    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, float]:
         """
         Генерирует денежные потоки FX Swap (в базовой валюте).
         """
@@ -255,9 +255,9 @@ class Futures(BaseDerivative):
     derivative_type: str = "Futures"
 
     # Параметры фьючерса
-    contract_size: Optional[Decimal] = None  # Размер контракта
-    tick_size: Optional[Decimal] = None  # Минимальный шаг цены
-    futures_price: Optional[Decimal] = None  # Цена фьючерса
+    contract_size: Optional[float] = None  # Размер контракта
+    tick_size: Optional[float] = None  # Минимальный шаг цены
+    futures_price: Optional[float] = None  # Цена фьючерса
     expiration_date: Optional[date] = None  # Дата экспирации
 
     # Тип контракта
@@ -265,7 +265,7 @@ class Futures(BaseDerivative):
 
     # Позиция
     is_long: bool = True  # True - длинная позиция, False - короткая
-    quantity: Optional[Decimal] = None  # Количество контрактов
+    quantity: Optional[float] = None  # Количество контрактов
 
     def calculate_risk_contribution(
         self,
@@ -353,7 +353,7 @@ class OIS(BaseDerivative):
             years_to_maturity = (contribution.repricing_date - calculation_date).days / 365.25
             contribution.duration = years_to_maturity / 2
             contribution.modified_duration = contribution.duration / (1 + self.fixed_rate)
-            contribution.dv01 = (self.notional_amount or self.amount) * Decimal(contribution.modified_duration) * Decimal(0.0001) * sign
+            contribution.dv01 = (self.notional_amount or self.amount) * float(contribution.modified_duration) * float(0.0001) * sign
 
         contribution.currency_exposure[self.currency] = self.amount
 
@@ -380,7 +380,7 @@ class TOM(BaseDerivative):
     # Параметры сделки TOM
     base_currency: Optional[str] = None  # Базовая валюта
     quote_currency: Optional[str] = None  # Котируемая валюта
-    exchange_rate: Optional[Decimal] = None  # Курс обмена
+    exchange_rate: Optional[float] = None  # Курс обмена
 
     # Направление
     is_buy: bool = True  # True - покупка базовой валюты
@@ -489,8 +489,8 @@ class Forward(BaseDerivative):
     derivative_type: str = "Forward"
 
     # Параметры форварда
-    forward_price: Optional[Decimal] = None  # Форвардная цена
-    spot_price: Optional[Decimal] = None  # Спот цена на момент заключения
+    forward_price: Optional[float] = None  # Форвардная цена
+    spot_price: Optional[float] = None  # Спот цена на момент заключения
     delivery_date: Optional[date] = None  # Дата поставки
 
     # Тип форварда
@@ -555,13 +555,13 @@ class XCCY(BaseDerivative):
 
     # Параметры первой ноги
     leg1_currency: Optional[str] = None  # Валюта первой ноги
-    leg1_notional: Optional[Decimal] = None  # Номинал первой ноги
+    leg1_notional: Optional[float] = None  # Номинал первой ноги
     leg1_rate: Optional[float] = None  # Ставка первой ноги
     leg1_is_fixed: bool = True  # Фиксированная или плавающая
 
     # Параметры второй ноги
     leg2_currency: Optional[str] = None  # Валюта второй ноги
-    leg2_notional: Optional[Decimal] = None  # Номинал второй ноги
+    leg2_notional: Optional[float] = None  # Номинал второй ноги
     leg2_rate: Optional[float] = None  # Ставка второй ноги
     leg2_is_fixed: bool = False  # Фиксированная или плавающая
 
@@ -570,7 +570,7 @@ class XCCY(BaseDerivative):
     exchange_notional_at_maturity: bool = True  # Обмен номиналами в конце
 
     # Курс обмена
-    fx_rate: Optional[Decimal] = None  # FX курс для обмена номиналов
+    fx_rate: Optional[float] = None  # FX курс для обмена номиналов
 
     def calculate_risk_contribution(
         self,
@@ -607,7 +607,7 @@ class XCCY(BaseDerivative):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         logger.debug(
             f"Calculated risk contribution for XCCY {self.instrument_id}",
@@ -620,7 +620,7 @@ class XCCY(BaseDerivative):
 
         return contribution
 
-    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, Decimal]:
+    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, float]:
         """
         Генерирует денежные потоки XCCY.
         Упрощенная модель.

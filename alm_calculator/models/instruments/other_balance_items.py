@@ -4,7 +4,7 @@ Other Assets and Other Liabilities instrument implementation
 """
 from typing import Dict, Optional
 from datetime import date, timedelta
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -36,7 +36,7 @@ class OtherAsset(BaseInstrument):
     # Специфичные атрибуты
     asset_category: Optional[str] = None  # 'fixed_assets', 'intangible', 'receivables', 'other'
     is_monetary: bool = True  # Является ли денежным активом (влияет на FX risk)
-    liquidation_value: Optional[Decimal] = None  # Ликвидационная стоимость
+    liquidation_value: Optional[float] = None  # Ликвидационная стоимость
     liquidity_haircut: Optional[float] = None  # Дисконт при срочной продаже (0-1)
 
     def calculate_risk_contribution(
@@ -63,11 +63,11 @@ class OtherAsset(BaseInstrument):
             years_to_maturity = (self.maturity_date - calculation_date).days / 365.25
             contribution.duration = years_to_maturity
             contribution.modified_duration = years_to_maturity / (1 + self.interest_rate)
-            contribution.dv01 = self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001)
+            contribution.dv01 = self.amount * float(contribution.modified_duration) * float(0.0001)
         else:
             # Не чувствителен к ставкам (например, здания)
             contribution.repricing_date = None
-            contribution.repricing_amount = Decimal(0)
+            contribution.repricing_amount = 0.0
 
         # === Liquidity Risk ===
         cash_flows = self._generate_cash_flows(calculation_date, assumptions)
@@ -78,7 +78,7 @@ class OtherAsset(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # Только денежные активы имеют валютный риск
@@ -100,7 +100,7 @@ class OtherAsset(BaseInstrument):
         self,
         calculation_date: date,
         assumptions: Optional[Dict] = None
-    ) -> Dict[date, Decimal]:
+    ) -> Dict[date, float]:
         """
         Генерирует денежные потоки прочего актива.
 
@@ -124,7 +124,7 @@ class OtherAsset(BaseInstrument):
 
                 # Ликвидационная стоимость
                 haircut = self.liquidity_haircut if self.liquidity_haircut else 0.5  # Default 50% haircut
-                liquidation_amount = self.amount * Decimal(1 - haircut)
+                liquidation_amount = self.amount * float(1 - haircut)
 
                 cash_flows[liquidation_date] = liquidation_amount
             # Иначе - считаем неликвидным (не генерирует CF в модели)
@@ -216,10 +216,10 @@ class OtherLiability(BaseInstrument):
             contribution.duration = years_to_maturity
             contribution.modified_duration = years_to_maturity / (1 + self.interest_rate)
             # Пассив - отрицательный DV01
-            contribution.dv01 = -self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001)
+            contribution.dv01 = -self.amount * float(contribution.modified_duration) * float(0.0001)
         else:
             contribution.repricing_date = None
-            contribution.repricing_amount = Decimal(0)
+            contribution.repricing_amount = 0.0
 
         # === Liquidity Risk ===
         cash_flows = self._generate_cash_flows(calculation_date, assumptions)
@@ -230,7 +230,7 @@ class OtherLiability(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # Только денежные обязательства имеют валютный риск
@@ -252,7 +252,7 @@ class OtherLiability(BaseInstrument):
         self,
         calculation_date: date,
         assumptions: Optional[Dict] = None
-    ) -> Dict[date, Decimal]:
+    ) -> Dict[date, float]:
         """
         Генерирует денежные потоки прочего пассива.
 

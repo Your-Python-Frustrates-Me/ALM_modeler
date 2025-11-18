@@ -139,9 +139,9 @@ class ElasticityParameters:
 class DepositVolumeChange:
     """Результат расчета изменения объема депозита"""
     instrument_id: str
-    original_amount: Decimal
-    new_amount: Decimal
-    volume_change: Decimal  # Абсолютное изменение
+    original_amount: float
+    new_amount: float
+    volume_change: float  # Абсолютное изменение
     volume_change_pct: float  # Процентное изменение
     rate_change_bps: float  # Изменение ставки в б.п.
     elasticity_used: float  # Примененная эластичность
