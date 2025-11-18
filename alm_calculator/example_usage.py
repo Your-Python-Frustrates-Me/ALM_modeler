@@ -1,6 +1,6 @@
 # example_usage.py
 from datetime import date
-from decimal import Decimal
+
 from models.instrument_factory import InstrumentFactory
 import logging
 

@@ -4,7 +4,7 @@ Interbank loan instrument implementation
 """
 from typing import Dict, Optional
 from datetime import date
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -92,7 +92,7 @@ class InterbankLoan(BaseInstrument):
 
             # DV01
             dv01_sign = 1 if self.is_placement else -1
-            contribution.dv01 = self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001) * dv01_sign
+            contribution.dv01 = self.amount * float(contribution.modified_duration) * float(0.0001) * dv01_sign
 
         # === Liquidity Risk ===
         # МБК - простой инструмент с единой датой погашения
@@ -104,7 +104,7 @@ class InterbankLoan(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # Размещение - актив, привлечение - пассив
@@ -123,7 +123,7 @@ class InterbankLoan(BaseInstrument):
 
         return contribution
 
-    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, Decimal]:
+    def _generate_cash_flows(self, calculation_date: date) -> Dict[date, float]:
         """
         Генерирует денежные потоки МБК.
 

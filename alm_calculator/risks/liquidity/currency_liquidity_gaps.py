@@ -107,12 +107,12 @@ class CurrencyLiquidityGapCalculator:
         self,
         instruments: List[BaseInstrument],
         risk_params: Dict
-    ) -> Dict[str, Dict[str, Dict[str, Decimal]]]:
+    ) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Собирает cash flows по валютам и временным бакетам.
 
         Returns:
-            Dict[currency, Dict[bucket, {'inflow': Decimal, 'outflow': Decimal}]]
+            Dict[currency, Dict[bucket, {'inflow': float, 'outflow': float}]]
         """
         cash_flows = {}
 
@@ -147,7 +147,7 @@ class CurrencyLiquidityGapCalculator:
     def _calculate_gaps_for_currency(
         self,
         currency: str,
-        cash_flows: Dict[str, Dict[str, Decimal]]
+        cash_flows: Dict[str, Dict[str, float]]
     ) -> pd.DataFrame:
         """
         Рассчитывает гэпы ликвидности для одной валюты.

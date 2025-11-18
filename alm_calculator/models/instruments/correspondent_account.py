@@ -4,7 +4,7 @@ Correspondent Account instrument implementation
 """
 from typing import Dict, Optional
 from datetime import date, timedelta
-from decimal import Decimal
+
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -88,7 +88,7 @@ class CorrespondentAccount(BaseInstrument):
 
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
 
         # === FX Risk ===
         # НОСТРО и корсчет в ЦБ - актив
@@ -114,7 +114,7 @@ class CorrespondentAccount(BaseInstrument):
         self,
         calculation_date: date,
         assumptions: Optional[Dict] = None
-    ) -> Dict[date, Decimal]:
+    ) -> Dict[date, float]:
         """
         Генерирует денежные потоки корсчета.
 
@@ -145,8 +145,8 @@ class CorrespondentAccount(BaseInstrument):
             # Обычно сохраняется минимальный остаток для операций
             if assumptions and 'nostro_stable_portion' in assumptions:
                 stable_portion = assumptions['nostro_stable_portion']
-                operational_amount = self.amount * Decimal(1 - stable_portion)
-                stable_amount = self.amount * Decimal(stable_portion)
+                operational_amount = self.amount * float(1 - stable_portion)
+                stable_amount = self.amount * float(stable_portion)
 
                 # Operational часть: доступна overnight
                 cash_flows[calculation_date + timedelta(days=1)] = operational_amount
