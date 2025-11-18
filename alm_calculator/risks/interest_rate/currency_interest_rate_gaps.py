@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 import logging
 
-from alm_calculator.core.base_instrument import BaseInstrument
+from alm_calculator.core.base_instrument import BaseInstrument, BookType
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,8 @@ class CurrencyInterestRateGapCalculator:
     def calculate(
         self,
         instruments: List[BaseInstrument],
-        risk_params: Dict
+        risk_params: Dict,
+        book_filter: Optional[BookType] = None
     ) -> Dict[str, pd.DataFrame]:
         """
         Рассчитывает процентные гэпы по валютам.
@@ -57,6 +58,7 @@ class CurrencyInterestRateGapCalculator:
         Args:
             instruments: Список инструментов
             risk_params: Параметры расчета рисков
+            book_filter: Фильтр по книге (TRADING/BANKING). Если None, расчет по всем книгам
 
         Returns:
             Dict[currency, DataFrame] где DataFrame содержит:
@@ -67,12 +69,20 @@ class CurrencyInterestRateGapCalculator:
             - cumulative_gap: кумулятивный гэп
             - gap_ratio: gap / total_assets
         """
+        # Фильтруем инструменты по книге, если указан фильтр
+        if book_filter is not None:
+            instruments = [inst for inst in instruments if inst.get_book() == book_filter]
+            book_desc = f" (book: {book_filter.value})"
+        else:
+            book_desc = " (all books)"
+
         logger.info(
-            f"Starting currency interest rate gap calculation",
+            f"Starting currency interest rate gap calculation{book_desc}",
             extra={
                 'calculation_date': str(self.calculation_date),
                 'currencies': self.target_currencies,
-                'instruments_count': len(instruments)
+                'instruments_count': len(instruments),
+                'book_filter': book_filter.value if book_filter else 'all'
             }
         )
 
@@ -160,6 +170,38 @@ class CurrencyInterestRateGapCalculator:
             )
 
         return sensitivity_by_currency
+
+    def calculate_by_books(
+        self,
+        instruments: List[BaseInstrument],
+        risk_params: Dict
+    ) -> Dict[str, Dict[str, pd.DataFrame]]:
+        """
+        Рассчитывает процентные гэпы отдельно для торговой и банковской книг.
+
+        Args:
+            instruments: Список инструментов
+            risk_params: Параметры расчета рисков
+
+        Returns:
+            Dict[book_type, Dict[currency, DataFrame]] где:
+            - book_type: 'trading' или 'banking'
+            - currency: код валюты
+            - DataFrame: таблица с гэпами
+        """
+        results = {}
+
+        # Расчет для торговой книги
+        logger.info("Calculating interest rate gaps for TRADING book")
+        trading_gaps = self.calculate(instruments, risk_params, book_filter=BookType.TRADING)
+        results['trading'] = trading_gaps
+
+        # Расчет для банковской книги
+        logger.info("Calculating interest rate gaps for BANKING book")
+        banking_gaps = self.calculate(instruments, risk_params, book_filter=BookType.BANKING)
+        results['banking'] = banking_gaps
+
+        return results
 
     def _collect_repricing_by_currency(
         self,
