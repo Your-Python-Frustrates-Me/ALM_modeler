@@ -8,7 +8,7 @@ Survival Horizon Calculator
 """
 from typing import List, Dict, Optional
 from datetime import date, timedelta
-from decimal import Decimal
+
 import pandas as pd
 import numpy as np
 import logging

@@ -3,7 +3,6 @@ Loan instrument implementation
 """
 from typing import Dict, Optional
 from datetime import date, timedelta
-from decimal import Decimal
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
@@ -25,7 +24,7 @@ class Loan(BaseInstrument):
     
     # Специфичные для кредита атрибуты
     repricing_date: Optional[date] = None  # Дата переоценки процентной ставки
-    repayment_schedule: Optional[Dict[date, Decimal]] = None  # График погашений
+    repayment_schedule: Optional[Dict[date, float]] = None  # График погашений
     prepayment_rate: Optional[float] = None  # Годовая ставка досрочного погашения
 
     # Дополнительные поля для классификации и учета
@@ -79,7 +78,7 @@ class Loan(BaseInstrument):
             contribution.modified_duration = years_to_maturity / (1 + self.interest_rate)
             
             # DV01: изменение стоимости при параллельном сдвиге на 1 б.п.
-            contribution.dv01 = self.amount * Decimal(contribution.modified_duration) * Decimal(0.0001)
+            contribution.dv01 = self.amount * contribution.modified_duration * 0.0001
         
         # === Liquidity Risk ===
         # Генерируем cash flows с учетом графика погашения или единой датой
@@ -94,7 +93,7 @@ class Loan(BaseInstrument):
         
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) + cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) + cf_amount
         
         # === FX Risk ===
         contribution.currency_exposure[self.currency] = self.amount
@@ -111,10 +110,10 @@ class Loan(BaseInstrument):
         return contribution
     
     def _generate_cash_flows(
-        self, 
+        self,
         calculation_date: date,
         assumptions: Optional[Dict] = None
-    ) -> Dict[date, Decimal]:
+    ) -> Dict[date, float]:
         """
         Генерирует денежные потоки с учетом:
         - Графика погашения
@@ -140,10 +139,10 @@ class Loan(BaseInstrument):
         return cash_flows
     
     def _apply_prepayment(
-        self, 
-        cash_flows: Dict[date, Decimal], 
+        self,
+        cash_flows: Dict[date, float],
         annual_prepayment_rate: float
-    ) -> Dict[date, Decimal]:
+    ) -> Dict[date, float]:
         """
         Применяет CPR (Constant Prepayment Rate) к денежным потокам.
         

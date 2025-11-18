@@ -1,7 +1,6 @@
 # models/instruments/deposit.py
 from typing import Dict, List, Optional
 from datetime import date, timedelta
-from decimal import Decimal
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType, RiskContribution
 from alm_calculator.utils.date_utils import assign_to_bucket
@@ -49,7 +48,7 @@ class Deposit(BaseInstrument):
     early_withdrawal_allowed: bool = False  # Возможность досрочного изъятия
     early_withdrawal_start_date: Optional[date] = None  # Дата начала возможности досрочного изъятия
     early_withdrawal_end_date: Optional[date] = None  # Дата окончания возможности досрочного изъятия
-    minimum_balance: Optional[Decimal] = None  # Минимальный остаток на счете
+    minimum_balance: Optional[float] = None  # Минимальный остаток на счете
 
     def calculate_risk_contribution(
             self,
@@ -80,7 +79,7 @@ class Deposit(BaseInstrument):
 
         # Amount для repricing (с учетом core portion для NMD)
         if self.is_demand_deposit and self.core_portion:
-            contribution.repricing_amount = self.amount * Decimal(self.core_portion)
+            contribution.repricing_amount = self.amount * self.core_portion
         else:
             contribution.repricing_amount = self.amount
 
@@ -89,7 +88,7 @@ class Deposit(BaseInstrument):
             years_to_maturity = (self.maturity_date - calculation_date).days / 365.25
             contribution.duration = years_to_maturity
             contribution.modified_duration = years_to_maturity / (1 + self.interest_rate)
-            contribution.dv01 = -self.amount * contribution.modified_duration * Decimal(0.0001)
+            contribution.dv01 = -self.amount * contribution.modified_duration * 0.0001
 
         # === Liquidity Risk ===
         cash_flows = self._generate_cash_flows(calculation_date, assumptions)
@@ -101,7 +100,7 @@ class Deposit(BaseInstrument):
         for cf_date, cf_amount in cash_flows.items():
             bucket = assign_to_bucket(calculation_date, cf_date, liquidity_buckets)
             # Депозиты - это outflow (отрицательный CF)
-            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, Decimal(0)) - cf_amount
+            contribution.cash_flows[bucket] = contribution.cash_flows.get(bucket, 0.0) - cf_amount
 
         # === FX Risk ===
         # Депозиты - пассив, поэтому отрицательная позиция
@@ -113,7 +112,7 @@ class Deposit(BaseInstrument):
             self,
             calculation_date: date,
             assumptions: Optional[Dict] = None
-    ) -> Dict[date, Decimal]:
+    ) -> Dict[date, float]:
         """
         Генерирует денежные потоки депозита.
 
@@ -128,7 +127,7 @@ class Deposit(BaseInstrument):
                 remaining_balance = self.amount
 
                 for bucket, rate in sorted(self.withdrawal_rates.items()):
-                    withdrawal_amount = remaining_balance * Decimal(rate)
+                    withdrawal_amount = remaining_balance * rate
                     # Определяем среднюю дату в бакете
                     bucket_mid_date = self._bucket_to_date(calculation_date, bucket)
                     cash_flows[bucket_mid_date] = withdrawal_amount

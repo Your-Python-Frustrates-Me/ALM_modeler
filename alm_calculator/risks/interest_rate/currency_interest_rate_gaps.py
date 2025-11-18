@@ -7,7 +7,7 @@ Currency Interest Rate Gaps Calculator
 """
 from typing import List, Dict, Optional, Tuple
 from datetime import date
-from decimal import Decimal
+
 import pandas as pd
 import numpy as np
 import logging
@@ -153,8 +153,8 @@ class CurrencyInterestRateGapCalculator:
             gap_limit_breached = any(abs(gaps_df['gap_ratio']) > 0.20)
 
             sensitivity_by_currency[currency] = {
-                'nii_impact_1y': Decimal(str(nii_impact)),
-                'eve_impact': Decimal(str(eve_impact)),
+                'nii_impact_1y': float(str(nii_impact)),
+                'eve_impact': float(str(eve_impact)),
                 'gap_limits_breached': gap_limit_breached,
                 'rate_shock_bps': rate_shock_bps
             }
@@ -236,12 +236,12 @@ class CurrencyInterestRateGapCalculator:
 
             if currency not in repricing_data:
                 repricing_data[currency] = {
-                    bucket: {'rsa': Decimal(0), 'rsl': Decimal(0)}
+                    bucket: {'rsa': 0.0, 'rsl': 0.0}
                     for bucket in self.repricing_buckets
                 }
 
             if bucket not in repricing_data[currency]:
-                repricing_data[currency][bucket] = {'rsa': Decimal(0), 'rsl': Decimal(0)}
+                repricing_data[currency][bucket] = {'rsa': 0.0, 'rsl': 0.0}
 
             # Распределяем по RSA/RSL
             if contribution.repricing_amount > 0:
@@ -300,7 +300,7 @@ class CurrencyInterestRateGapCalculator:
             DataFrame с гэпами
         """
         data = []
-        total_assets = Decimal(0)
+        total_assets = 0.0
 
         # Сначала считаем total assets
         for bucket_data in repricing_data.values():
@@ -308,7 +308,7 @@ class CurrencyInterestRateGapCalculator:
 
         # Рассчитываем гэпы по бакетам
         for bucket in self.repricing_buckets:
-            bucket_data = repricing_data.get(bucket, {'rsa': Decimal(0), 'rsl': Decimal(0)})
+            bucket_data = repricing_data.get(bucket, {'rsa': 0.0, 'rsl': 0.0})
 
             rsa = float(bucket_data['rsa'])
             rsl = float(bucket_data['rsl'])

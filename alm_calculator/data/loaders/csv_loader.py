@@ -9,7 +9,6 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Union, Optional
 from datetime import datetime, date
-from decimal import Decimal
 import ast
 
 from alm_calculator.models.instruments.loan import Loan
@@ -189,15 +188,15 @@ class CSVDataLoader:
                 else:
                     data[key] = None
 
-            # Convert amounts to Decimal
+            # Convert amounts to float
             elif key in ['amount', 'notional_amount', 'collateral_value',
                          'pay_leg_amount', 'receive_leg_amount',
                          'utilized_amount', 'available_amount']:
                 try:
-                    data[key] = Decimal(str(value))
+                    data[key] = float(value)
                 except Exception:
-                    logger.warning(f"Failed to convert to Decimal: {key}={value}")
-                    data[key] = Decimal(0)
+                    logger.warning(f"Failed to convert to float: {key}={value}")
+                    data[key] = 0.0
 
             # Parse dict strings (for withdrawal_rates, etc.)
             elif isinstance(value, str) and value.startswith('{'):
