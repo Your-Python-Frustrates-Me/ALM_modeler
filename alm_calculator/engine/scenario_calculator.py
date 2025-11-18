@@ -9,7 +9,6 @@ import numpy as np
 import logging
 from typing import List, Dict, Optional
 from datetime import date, timedelta
-from decimal import Decimal
 from dataclasses import dataclass, field
 
 from alm_calculator.core.base_instrument import BaseInstrument, RiskContribution
@@ -80,18 +79,18 @@ class ScenarioResult:
 
     # Interest rate risk metrics
     interest_rate_gaps: Optional[pd.DataFrame] = None
-    repricing_gap_total: Optional[Decimal] = None
+    repricing_gap_total: Optional[float] = None
     duration_gap: Optional[float] = None
-    dv01_total: Optional[Decimal] = None
+    dv01_total: Optional[float] = None
 
     # FX risk metrics
-    fx_positions: Optional[Dict[str, Decimal]] = None
-    fx_exposure_total: Optional[Decimal] = None
+    fx_positions: Optional[Dict[str, float]] = None
+    fx_exposure_total: Optional[float] = None
 
     # Summary metrics
-    total_assets: Optional[Decimal] = None
-    total_liabilities: Optional[Decimal] = None
-    net_position: Optional[Decimal] = None
+    total_assets: Optional[float] = None
+    total_liabilities: Optional[float] = None
+    net_position: Optional[float] = None
 
     # Detailed contributions
     risk_contributions: Optional[List[RiskContribution]] = None
@@ -226,13 +225,13 @@ class ScenarioCalculator:
             if scenario.deposit_runoff_pct > 0:
                 if stressed_inst.instrument_type.value == 'deposit':
                     runoff_multiplier = 1 - (scenario.deposit_runoff_pct / 100)
-                    stressed_inst.amount = stressed_inst.amount * Decimal(runoff_multiplier)
+                    stressed_inst.amount = stressed_inst.amount * runoff_multiplier
 
             # Credit line drawdown (увеличиваем utilized для off-balance)
             if scenario.credit_line_drawdown_pct > 0:
                 if stressed_inst.instrument_type.value == 'off_balance':
                     if hasattr(stressed_inst, 'available_amount') and stressed_inst.available_amount:
-                        drawdown = stressed_inst.available_amount * Decimal(scenario.credit_line_drawdown_pct / 100)
+                        drawdown = stressed_inst.available_amount * (scenario.credit_line_drawdown_pct / 100)
                         if hasattr(stressed_inst, 'utilized_amount'):
                             if stressed_inst.utilized_amount:
                                 stressed_inst.utilized_amount += drawdown
@@ -315,7 +314,7 @@ class ScenarioCalculator:
                     liquidity_gaps_by_currency[currency] = {}
 
                 if bucket not in liquidity_gaps_by_currency[currency]:
-                    liquidity_gaps_by_currency[currency][bucket] = Decimal(0)
+                    liquidity_gaps_by_currency[currency][bucket] = 0.0
 
                 liquidity_gaps_by_currency[currency][bucket] += amount
 
@@ -355,7 +354,7 @@ class ScenarioCalculator:
                 bucket = self._assign_to_irr_bucket(scenario.calculation_date, contrib.repricing_date)
 
                 if bucket not in irr_gaps_by_currency[currency]:
-                    irr_gaps_by_currency[currency][bucket] = Decimal(0)
+                    irr_gaps_by_currency[currency][bucket] = 0.0
 
                 irr_gaps_by_currency[currency][bucket] += contrib.repricing_amount
 
@@ -378,7 +377,7 @@ class ScenarioCalculator:
                     })
 
             result.interest_rate_gaps = pd.DataFrame(irr_gaps_data)
-            result.repricing_gap_total = sum([Decimal(row['repricing_gap']) for row in irr_gaps_data])
+            result.repricing_gap_total = sum([row['repricing_gap'] for row in irr_gaps_data])
 
         # Aggregate duration (weighted by amount - simplified)
         if duration_contributions:
@@ -393,7 +392,7 @@ class ScenarioCalculator:
         for contrib in risk_contributions:
             for currency, exposure in contrib.currency_exposure.items():
                 if currency not in fx_positions:
-                    fx_positions[currency] = Decimal(0)
+                    fx_positions[currency] = 0.0
                 fx_positions[currency] += exposure
 
         result.fx_positions = fx_positions
@@ -403,8 +402,8 @@ class ScenarioCalculator:
         result.fx_exposure_total = sum([abs(exp) for exp in fx_positions.values()])
 
         # === Summary Metrics ===
-        total_assets = Decimal(0)
-        total_liabilities = Decimal(0)
+        total_assets = 0.0
+        total_liabilities = 0.0
 
         for contrib in risk_contributions:
             for currency, exposure in contrib.currency_exposure.items():

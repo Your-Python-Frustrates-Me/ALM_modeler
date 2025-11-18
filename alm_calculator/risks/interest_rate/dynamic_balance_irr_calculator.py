@@ -7,7 +7,7 @@ Dynamic Balance Sheet Interest Rate Risk Calculator
 """
 from typing import Dict, List, Optional, Tuple
 from datetime import date
-from decimal import Decimal
+
 import pandas as pd
 import logging
 
@@ -349,7 +349,7 @@ def export_dynamic_irr_to_excel(
     for currency in result['static']['sensitivity'].keys():
         static_nii = result['static']['sensitivity'][currency]['nii_impact_1y']
         dynamic_nii = result['dynamic']['sensitivity'][currency]['nii_impact_1y']
-        diff = result['comparison']['nii_impact_difference'].get(currency, Decimal(0))
+        diff = result['comparison']['nii_impact_difference'].get(currency, 0.0)
         diff_pct = float(diff / static_nii * 100) if static_nii != 0 else 0.0
 
         ws_summary.cell(row=row, column=1, value=currency)

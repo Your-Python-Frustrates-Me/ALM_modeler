@@ -10,7 +10,7 @@ Factor Analysis for Risk Metrics
 """
 from typing import List, Dict, Optional, Tuple, Callable, Any
 from datetime import date, timedelta
-from decimal import Decimal
+
 import pandas as pd
 import numpy as np
 import logging

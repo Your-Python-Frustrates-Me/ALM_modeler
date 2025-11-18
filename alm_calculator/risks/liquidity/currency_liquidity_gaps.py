@@ -7,7 +7,7 @@ Currency Liquidity Gaps Calculator
 """
 from typing import List, Dict, Optional
 from datetime import date
-from decimal import Decimal
+
 import pandas as pd
 import logging
 
@@ -128,14 +128,14 @@ class CurrencyLiquidityGapCalculator:
 
             if currency not in cash_flows:
                 cash_flows[currency] = {
-                    bucket: {'inflow': Decimal(0), 'outflow': Decimal(0)}
+                    bucket: {'inflow': 0.0, 'outflow': 0.0}
                     for bucket in self.liquidity_buckets
                 }
 
             # Распределяем cash flows по бакетам
             for bucket, cf_amount in contribution.cash_flows.items():
                 if bucket not in cash_flows[currency]:
-                    cash_flows[currency][bucket] = {'inflow': Decimal(0), 'outflow': Decimal(0)}
+                    cash_flows[currency][bucket] = {'inflow': 0.0, 'outflow': 0.0}
 
                 if cf_amount > 0:
                     cash_flows[currency][bucket]['inflow'] += cf_amount
@@ -162,7 +162,7 @@ class CurrencyLiquidityGapCalculator:
         data = []
 
         for bucket in self.liquidity_buckets:
-            bucket_data = cash_flows.get(bucket, {'inflow': Decimal(0), 'outflow': Decimal(0)})
+            bucket_data = cash_flows.get(bucket, {'inflow': 0.0, 'outflow': 0.0})
 
             inflow = float(bucket_data['inflow'])
             outflow = float(bucket_data['outflow'])

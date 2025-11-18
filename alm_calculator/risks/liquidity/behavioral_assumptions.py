@@ -7,7 +7,7 @@ Behavioral Assumptions Configuration System
 """
 from typing import Dict, List, Optional, Any
 from datetime import date, timedelta
-from decimal import Decimal
+
 from dataclasses import dataclass, field
 from enum import Enum
 import logging

@@ -1,6 +1,5 @@
 # models/instrument_factory.py
 from typing import Dict, List, Type
-from decimal import Decimal
 import logging
 
 from alm_calculator.core.base_instrument import BaseInstrument, InstrumentType
@@ -191,7 +190,7 @@ class InstrumentFactory:
             'instrument_id': balance_row['position_id'],
             'instrument_type': instrument_type,
             'balance_account': balance_row['balance_account'],
-            'amount': Decimal(str(balance_row['amount'])),
+            'amount': float(balance_row['amount']),
             'currency': balance_row['currency'],
             'start_date': self._parse_date(balance_row['start_date']),
             'as_of_date': self._parse_date(balance_row['as_of_date']),

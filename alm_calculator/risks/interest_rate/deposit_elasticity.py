@@ -7,7 +7,7 @@ Deposit Elasticity Model for Interest Rate Risk
 """
 from typing import Dict, List, Optional, Tuple
 from datetime import date
-from decimal import Decimal
+
 from dataclasses import dataclass, field
 import pandas as pd
 import numpy as np
@@ -292,11 +292,11 @@ class DepositElasticityCalculator:
             )
 
         # Рассчитываем новый объем
-        new_amount = original_amount * Decimal(1 + volume_change_pct)
+        new_amount = original_amount * float(1 + volume_change_pct)
 
         # Ограничение минимального остатка
         if params.min_remaining_volume:
-            min_amount = original_amount * Decimal(params.min_remaining_volume)
+            min_amount = original_amount * float(params.min_remaining_volume)
             new_amount = max(min_amount, new_amount)
 
         volume_change = new_amount - original_amount

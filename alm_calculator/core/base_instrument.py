@@ -4,7 +4,6 @@ Base classes and interfaces for financial instruments
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
 from datetime import date
-from decimal import Decimal
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -51,28 +50,28 @@ class BookType(str, Enum):
 class RiskContribution(BaseModel):
     """
     Вклад инструмента в риск-метрики
-    
+
     Этот класс собирает все риск-метрики для одного инструмента,
     которые затем агрегируются на портфельном уровне.
     """
     instrument_id: str
     instrument_type: InstrumentType
-    
+
     # Interest Rate Risk
-    repricing_amount: Decimal = Decimal(0)
+    repricing_amount: float = 0.0
     repricing_date: Optional[date] = None
     duration: Optional[float] = None
     modified_duration: Optional[float] = None
-    dv01: Optional[Decimal] = None
-    
+    dv01: Optional[float] = None
+
     # Liquidity Risk
-    cash_flows: Dict[str, Decimal] = Field(default_factory=dict)
+    cash_flows: Dict[str, float] = Field(default_factory=dict)
     # Ключ - временная корзина ('0-30d'), значение - сумма CF
-    
+
     # FX Risk
-    currency_exposure: Dict[str, Decimal] = Field(default_factory=dict)
+    currency_exposure: Dict[str, float] = Field(default_factory=dict)
     # Ключ - валюта, значение - позиция
-    
+
     class Config:
         frozen = False
 
@@ -95,7 +94,7 @@ class BaseInstrument(ABC, BaseModel):
     instrument_id: str
     instrument_type: InstrumentType
     balance_account: str
-    amount: Decimal
+    amount: float
     currency: str
     start_date: date
     as_of_date: date
